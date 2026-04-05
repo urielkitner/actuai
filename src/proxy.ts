@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Only guard the two protected prefixes; everything else is public and
@@ -34,8 +34,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Only invoke middleware for the two protected prefixes.
+  // Only invoke proxy for the two protected prefixes.
   // All other routes (/auth, /pricing, /, /auth/callback, _next/*, etc.)
-  // are never touched by this middleware.
+  // are never touched by this proxy.
   matcher: ['/dashboard/:path*', '/cases/:path*'],
 }
