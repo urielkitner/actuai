@@ -99,6 +99,9 @@ function AuthForm() {
               height: '80px',
               objectFit: 'contain',
               marginBottom: '1rem',
+              background: 'white',
+              borderRadius: '12px',
+              padding: '4px',
             }}
           />
           <h1

@@ -174,7 +174,7 @@ export default function SummaryPage({ params }: { params: Promise<{ id: string }
           <img
             src="/logo.png"
             alt="ActuAi logo"
-            style={{ width: '36px', height: '36px', objectFit: 'contain' }}
+            style={{ width: '36px', height: '36px', objectFit: 'contain', background: 'white', borderRadius: '12px', padding: '4px' }}
           />
           <span style={{ fontWeight: '800', fontSize: '1.125rem', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ActuAi</span>
         </div>

@@ -113,7 +113,7 @@ export default function NewCasePage() {
           <img
             src="/logo.png"
             alt="ActuAi logo"
-            style={{ width: '36px', height: '36px', objectFit: 'contain' }}
+            style={{ width: '36px', height: '36px', objectFit: 'contain', background: 'white', borderRadius: '12px', padding: '4px' }}
           />
           <span
             style={{
