@@ -1,22 +1,21 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Routes that never require authentication
-const PUBLIC_ROUTES = ['/auth', '/pricing']
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Let public routes and the root splash through unconditionally
-  if (pathname === '/' || PUBLIC_ROUTES.some(r => pathname.startsWith(r))) {
+  // Only guard the two protected prefixes; everything else is public and
+  // handled by the pages themselves or not gated at all.
+  const isProtected =
+    pathname.startsWith('/dashboard') || pathname.startsWith('/cases')
+
+  if (!isProtected) {
     return NextResponse.next()
   }
 
-  // Supabase v2 + our cookieStorage adapter writes the session under a cookie
-  // named  sb-<project-ref>-auth-token  (the default storageKey).
-  // We only need to confirm the cookie is present and non-empty here; the full
-  // token validation happens client-side via supabase.auth.getSession() on
-  // every page load, which also handles refresh automatically.
+  // Supabase v2 writes the session under a cookie named sb-<ref>-auth-token.
+  // A cookie presence check is enough here — the pages do a full
+  // supabase.auth.getSession() call which validates and refreshes the token.
   const hasSession = request.cookies.getAll().some(
     c =>
       c.name.startsWith('sb-') &&
@@ -27,7 +26,6 @@ export function middleware(request: NextRequest) {
   if (!hasSession) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth'
-    // Preserve destination so /auth/callback can redirect back after login
     url.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(url)
   }
@@ -36,7 +34,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  // Only invoke middleware for the two protected prefixes.
+  // All other routes (/auth, /pricing, /, /auth/callback, _next/*, etc.)
+  // are never touched by this middleware.
+  matcher: ['/dashboard/:path*', '/cases/:path*'],
 }
