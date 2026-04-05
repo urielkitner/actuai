@@ -566,13 +566,11 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
           style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer' }}
           onClick={() => router.push('/dashboard')}
         >
-          <div style={{
-            width: '36px', height: '36px',
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ color: 'white', fontWeight: '800' }}>A</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="ActuAi logo"
+            style={{ width: '36px', height: '36px', objectFit: 'contain' }}
+          />
           <span style={{
             fontWeight: '800', fontSize: '1.125rem',
             background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',

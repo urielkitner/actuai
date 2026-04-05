@@ -91,21 +91,16 @@ function AuthForm() {
       <div style={{ width: '100%', maxWidth: '440px' }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div
+          <img
+            src="/logo.png"
+            alt="ActuAi logo"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '64px',
-              height: '64px',
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-              borderRadius: '16px',
+              width: '80px',
+              height: '80px',
+              objectFit: 'contain',
               marginBottom: '1rem',
-              boxShadow: '0 8px 24px rgb(99 102 241 / 0.3)',
             }}
-          >
-            <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: '800' }}>A</span>
-          </div>
+          />
           <h1
             style={{
               fontSize: '1.75rem',

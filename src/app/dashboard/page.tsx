@@ -89,14 +89,11 @@ export default function DashboardPage() {
         position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-          <div style={{
-            width: '36px', height: '36px',
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgb(99 102 241 / 0.25)',
-          }}>
-            <span style={{ color: 'white', fontWeight: '800', fontSize: '1rem' }}>A</span>
-          </div>
+          <img
+            src="/logo.png"
+            alt="ActuAi logo"
+            style={{ width: '36px', height: '36px', objectFit: 'contain' }}
+          />
           <span style={{
             fontWeight: '800', fontSize: '1.125rem',
             background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
