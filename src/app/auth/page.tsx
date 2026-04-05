@@ -1,0 +1,292 @@
+'use client'
+
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+
+type Tab = 'login' | 'register'
+type UserType = 'independent' | 'office'
+
+function AuthForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirectTo') ?? '/dashboard'
+  const [tab, setTab] = useState<Tab>('login')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  // Login fields
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+
+  // Register fields
+  const [fullName, setFullName] = useState('')
+  const [regEmail, setRegEmail] = useState('')
+  const [regPassword, setRegPassword] = useState('')
+  const [userType, setUserType] = useState<UserType>('independent')
+  const [ilaaMemember, setIlaaMemember] = useState(false)
+  const [idNumber, setIdNumber] = useState('')
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      })
+      if (error) throw error
+      router.replace(redirectTo)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'שגיאה בהתחברות')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: regEmail,
+        password: regPassword,
+        options: {
+          // Tell Supabase where to redirect after the user clicks the
+          // confirmation link in their email. Must also be added to
+          // "Redirect URLs" in your Supabase project's Auth settings.
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            full_name: fullName,
+            user_type: userType,
+            ilaa_member: ilaaMemember,
+            id_number: ilaaMemember ? idNumber : undefined,
+          },
+        },
+      })
+      if (error) throw error
+      setSuccess('נשלח אימייל אימות! אנא בדוק את תיבת הדואר שלך.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'שגיאה בהרשמה')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8f7ff 0%, #f0f4ff 50%, #faf5ff 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2rem 1rem',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: '440px' }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '64px',
+              height: '64px',
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              borderRadius: '16px',
+              marginBottom: '1rem',
+              boxShadow: '0 8px 24px rgb(99 102 241 / 0.3)',
+            }}
+          >
+            <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: '800' }}>A</span>
+          </div>
+          <h1
+            style={{
+              fontSize: '1.75rem',
+              fontWeight: '800',
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              margin: '0 0 0.5rem 0',
+            }}
+          >
+            ActuAi
+          </h1>
+          <p style={{ fontWeight: '600', color: '#374151', margin: '0 0 0.5rem 0', fontSize: '1rem' }}>
+            המערכת החכמה לאיזון משאבים
+          </p>
+          <p style={{ color: '#6b7280', fontSize: '0.8125rem', margin: 0, lineHeight: '1.6' }}>
+            פלטפורמה מקצועית לאקטוארים לניהול תיקי איזון משאבים<br />
+            בצורה מדויקת, מהירה ומאורגנת
+          </p>
+        </div>
+
+        {/* Card */}
+        <div className="card" style={{ padding: '2rem' }}>
+          {/* Tabs */}
+          <div className="tab-list" style={{ marginBottom: '1.5rem' }}>
+            <button
+              className={`tab ${tab === 'login' ? 'active' : ''}`}
+              onClick={() => { setTab('login'); setError(''); setSuccess('') }}
+              style={{ flex: 1, justifyContent: 'center' }}
+            >
+              התחברות
+            </button>
+            <button
+              className={`tab ${tab === 'register' ? 'active' : ''}`}
+              onClick={() => { setTab('register'); setError(''); setSuccess('') }}
+              style={{ flex: 1, justifyContent: 'center' }}
+            >
+              הרשמה
+            </button>
+          </div>
+
+          {error && <div className="alert-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+          {success && <div className="alert-success" style={{ marginBottom: '1rem' }}>{success}</div>}
+
+          {tab === 'login' ? (
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="label">אימייל</label>
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="your@email.com"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  required
+                  dir="ltr"
+                  style={{ textAlign: 'left' }}
+                />
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label className="label">סיסמה</label>
+                <input
+                  type="password"
+                  className="input"
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)}
+                  required
+                  dir="ltr"
+                  style={{ textAlign: 'left' }}
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={loading}
+                style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }}
+              >
+                {loading ? 'מתחבר...' : 'התחבר'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleRegister}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="label">שם מלא</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="ישראל ישראלי"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  required
+                />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="label">אימייל</label>
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="your@email.com"
+                  value={regEmail}
+                  onChange={e => setRegEmail(e.target.value)}
+                  required
+                  dir="ltr"
+                  style={{ textAlign: 'left' }}
+                />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="label">סיסמה</label>
+                <input
+                  type="password"
+                  className="input"
+                  placeholder="••••••••"
+                  value={regPassword}
+                  onChange={e => setRegPassword(e.target.value)}
+                  required
+                  dir="ltr"
+                  style={{ textAlign: 'left' }}
+                />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="label">סוג משתמש</label>
+                <select
+                  className="input"
+                  value={userType}
+                  onChange={e => setUserType(e.target.value as UserType)}
+                >
+                  <option value="independent">עצמאי</option>
+                  <option value="office">משרד</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: ilaaMemember ? '1rem' : '1.5rem' }}>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={ilaaMemember}
+                    onChange={e => setIlaaMemember(e.target.checked)}
+                  />
+                  <span>חבר/ה ILAA (האיגוד הישראלי לאקטוארים)</span>
+                </label>
+              </div>
+              {ilaaMemember && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label className="label">תעודת זהות</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="000000000"
+                    value={idNumber}
+                    onChange={e => setIdNumber(e.target.value)}
+                    maxLength={9}
+                    dir="ltr"
+                    style={{ textAlign: 'left' }}
+                  />
+                </div>
+              )}
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={loading}
+                style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }}
+              >
+                {loading ? 'נרשם...' : 'הרשמה'}
+              </button>
+            </form>
+          )}
+        </div>
+
+        <p style={{ textAlign: 'center', marginTop: '1.5rem', color: '#9ca3af', fontSize: '0.75rem' }}>
+          © 2025 ActuAi. כל הזכויות שמורות.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense>
+      <AuthForm />
+    </Suspense>
+  )
+}
