@@ -15,6 +15,7 @@ function AuthForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [ilaaRegistered, setIlaaRegistered] = useState(false)
 
   // Login fields
   const [loginEmail, setLoginEmail] = useState('')
@@ -33,11 +34,26 @@ function AuthForm() {
     setError('')
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password: loginPassword,
       })
       if (error) throw error
+
+      // Check ILAA status — block pending users
+      if (data.session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('ilaa_status')
+          .eq('id', data.session.user.id)
+          .single()
+
+        if (profile?.ilaa_status === 'pending') {
+          await supabase.auth.signOut()
+          throw new Error('בקשת האימות שלך עדיין בבדיקה')
+        }
+      }
+
       router.replace(redirectTo)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'שגיאה בהתחברות')
@@ -56,25 +72,77 @@ function AuthForm() {
         email: regEmail,
         password: regPassword,
         options: {
-          // Tell Supabase where to redirect after the user clicks the
-          // confirmation link in their email. Must also be added to
-          // "Redirect URLs" in your Supabase project's Auth settings.
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
             user_type: userType,
             ilaa_member: ilaaMemember,
             id_number: ilaaMemember ? idNumber : undefined,
+            ilaa_status: ilaaMemember ? 'pending' : 'none',
           },
         },
       })
       if (error) throw error
-      setSuccess('נשלח אימייל אימות! אנא בדוק את תיבת הדואר שלך.')
+
+      if (ilaaMemember) {
+        // Send notification email to admin
+        await fetch('/api/ilaa/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fullName, email: regEmail, idNumber }),
+        })
+        setIlaaRegistered(true)
+      } else {
+        setSuccess('נשלח אימייל אימות! אנא בדוק את תיבת הדואר שלך.')
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'שגיאה בהרשמה')
     } finally {
       setLoading(false)
     }
+  }
+
+  // ILAA pending waiting screen
+  if (ilaaRegistered) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #f8f7ff 0%, #f0f4ff 50%, #faf5ff 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem 1rem',
+        }}
+      >
+        <div style={{ width: '100%', maxWidth: '480px', textAlign: 'center' }}>
+          <img
+            src="/logo.png"
+            alt="ActuAi logo"
+            style={{ width: '80px', height: '80px', objectFit: 'contain', marginBottom: '1.5rem' }}
+          />
+          <div className="card" style={{ padding: '2.5rem' }}>
+            <div style={{
+              width: '56px', height: '56px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #fef9c3, #fde68a)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 1.5rem',
+              fontSize: '1.75rem',
+            }}>
+              ⏳
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1f2937', margin: '0 0 1rem 0' }}>
+              ההרשמה נקלטה בהצלחה!
+            </h2>
+            <p style={{ color: '#374151', lineHeight: '1.7', margin: 0 }}>
+              בקשת האימות שלך ל-ILAA נמצאת בבדיקה.
+              <br />
+              תקבל מייל לאחר האישור.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

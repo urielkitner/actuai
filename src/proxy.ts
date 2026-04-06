@@ -7,7 +7,7 @@ export function proxy(request: NextRequest) {
   // Only guard the two protected prefixes; everything else is public and
   // handled by the pages themselves or not gated at all.
   const isProtected =
-    pathname.startsWith('/dashboard') || pathname.startsWith('/cases')
+    pathname.startsWith('/dashboard') || pathname.startsWith('/cases') || pathname.startsWith('/admin')
 
   if (!isProtected) {
     return NextResponse.next()
@@ -37,5 +37,5 @@ export const config = {
   // Only invoke proxy for the two protected prefixes.
   // All other routes (/auth, /pricing, /, /auth/callback, _next/*, etc.)
   // are never touched by this proxy.
-  matcher: ['/dashboard/:path*', '/cases/:path*'],
+  matcher: ['/dashboard/:path*', '/cases/:path*', '/admin/:path*'],
 }
