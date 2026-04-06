@@ -242,6 +242,33 @@ function simpleToDb(r: SimpleRow, caseId: string, category: 'financial' | 'vehic
 
 // ─── Cases ────────────────────────────────────────────────────────────────────
 
+/**
+ * Returns the next suggested case number in AC-YYYY-NNNN format.
+ * Queries all cases visible to the current user (RLS-scoped) for the current
+ * year, finds the highest sequence number, and returns max+1.
+ * Falls back to AC-{year}-0001 if no cases exist yet.
+ */
+export async function nextCaseNumber(): Promise<string> {
+  const year = new Date().getFullYear()
+  const prefix = `AC-${year}-`
+
+  const { data } = await supabase
+    .from('cases')
+    .select('case_number')
+    .like('case_number', `${prefix}%`)
+    .order('case_number', { ascending: false })
+    .limit(1)
+
+  if (data && data.length > 0) {
+    const last = data[0].case_number as string
+    const seq = parseInt(last.replace(prefix, ''), 10)
+    const next = isNaN(seq) ? 1 : seq + 1
+    return `${prefix}${String(next).padStart(4, '0')}`
+  }
+
+  return `${prefix}0001`
+}
+
 export async function loadCases(): Promise<CaseSummaryRow[]> {
   const { data, error } = await supabase
     .from('cases_summary')
@@ -264,6 +291,7 @@ export async function loadCases(): Promise<CaseSummaryRow[]> {
 }
 
 export async function createCase(params: {
+  caseNumber: string
   partyAName: string; partyAIdNumber: string; partyABirthDate: string
   partyBName: string; partyBIdNumber: string; partyBBirthDate: string
   marriageDate: string; separationDate: string
@@ -274,6 +302,7 @@ export async function createCase(params: {
   const { data, error } = await supabase
     .from('cases')
     .insert({
+      case_number: params.caseNumber,
       actuary_id: session.user.id,
       party_a_name: params.partyAName,
       party_a_id_number: params.partyAIdNumber,
@@ -288,7 +317,13 @@ export async function createCase(params: {
     .select('id')
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Postgres unique constraint violation
+    if (error.code === '23505') {
+      throw new Error('מספר תיק זה כבר קיים במערכת, אנא בחר מספר אחר')
+    }
+    throw new Error(error.message)
+  }
   return data.id
 }
 

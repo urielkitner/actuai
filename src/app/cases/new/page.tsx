@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { createCase } from '@/lib/db'
+import { createCase, nextCaseNumber } from '@/lib/db'
 
 interface PartyForm {
   fullName: string
@@ -48,14 +48,17 @@ export default function NewCasePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [caseNumber, setCaseNumber] = useState('')
   const [partyA, setPartyA] = useState<PartyForm>(emptyParty)
   const [partyB, setPartyB] = useState<PartyForm>(emptyParty)
   const [marriageDate, setMarriageDate] = useState('')
   const [separationDate, setSeparationDate] = useState('')
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) router.replace('/auth')
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) { router.replace('/auth'); return }
+      const suggested = await nextCaseNumber()
+      setCaseNumber(suggested)
     })
   }, [router])
 
@@ -63,6 +66,10 @@ export default function NewCasePage() {
     e.preventDefault()
     setError('')
 
+    if (!caseNumber.trim()) {
+      setError('אנא הזן מספר תיק')
+      return
+    }
     if (!partyA.fullName || !partyA.idNumber || !partyA.dateOfBirth) {
       setError('אנא מלא את כל פרטי צד א')
       return
@@ -79,6 +86,7 @@ export default function NewCasePage() {
     setLoading(true)
     try {
       const caseId = await createCase({
+        caseNumber: caseNumber.trim(),
         partyAName: partyA.fullName,
         partyAIdNumber: partyA.idNumber,
         partyABirthDate: partyA.dateOfBirth,
@@ -148,6 +156,24 @@ export default function NewCasePage() {
           {error && <div className="alert-error" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
           <form onSubmit={handleSubmit}>
+            {/* Case Number */}
+            <div style={{ marginBottom: '2rem' }}>
+              <label className="label">מספר תיק</label>
+              <input
+                type="text"
+                className="input"
+                value={caseNumber}
+                onChange={e => setCaseNumber(e.target.value)}
+                placeholder="AC-2026-0001"
+                dir="ltr"
+                style={{ textAlign: 'left', fontFamily: 'monospace', fontWeight: '600' }}
+                required
+              />
+              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.375rem' }}>
+                מספר התיק נוצר אוטומטית — ניתן לשנות אותו ידנית
+              </p>
+            </div>
+
             {/* Party A */}
             <div style={{ marginBottom: '2rem' }}>
               <div
