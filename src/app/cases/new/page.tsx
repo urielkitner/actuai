@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { createCase } from '@/lib/db'
 
@@ -109,7 +110,7 @@ export default function NewCasePage() {
           boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer' }} onClick={() => router.push('/dashboard')}>
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
           <img
             src="/logo.png"
             alt="ActuAi logo"
@@ -127,7 +128,7 @@ export default function NewCasePage() {
           >
             ActuAi
           </span>
-        </div>
+        </Link>
         <button className="btn-secondary" onClick={() => router.push('/dashboard')} style={{ fontSize: '0.875rem' }}>
           ← חזור ללוח הבקרה
         </button>

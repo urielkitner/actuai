@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { loadAssets } from '@/lib/db'
 import type { Assets, SimpleRow } from '@/lib/db'
@@ -170,14 +171,14 @@ export default function SummaryPage({ params }: { params: Promise<{ id: string }
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       {/* Navbar */}
       <nav style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '0 1.5rem', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer' }} onClick={() => router.push('/dashboard')}>
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
           <img
             src="/logo.png"
             alt="ActuAi logo"
             style={{ width: '36px', height: '36px', objectFit: 'contain' }}
           />
           <span style={{ fontWeight: '800', fontSize: '1.125rem', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>ActuAi</span>
-        </div>
+        </Link>
         <button className="btn-secondary" onClick={() => router.push('/dashboard')} style={{ fontSize: '0.875rem' }}>
           ← חזור ללוח הבקרה
         </button>

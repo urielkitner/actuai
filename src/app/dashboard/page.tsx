@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { loadCases, updateCaseStatus } from '@/lib/db'
 import type { CaseSummaryRow, CaseStatus } from '@/lib/db'
+import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
 
 const STATUS_LABELS: Record<CaseStatus, string> = {
@@ -88,7 +89,7 @@ export default function DashboardPage() {
         height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
           <img
             src="/logo.png"
             alt="ActuAi logo"
@@ -99,7 +100,7 @@ export default function DashboardPage() {
             background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
           }}>ActuAi</span>
-        </div>
+        </Link>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
