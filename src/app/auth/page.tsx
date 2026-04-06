@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-type Tab = 'login' | 'register'
+type Tab = 'login' | 'register' | 'forgot'
 type UserType = 'independent' | 'office'
 
 function AuthForm() {
@@ -16,6 +16,9 @@ function AuthForm() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [ilaaRegistered, setIlaaRegistered] = useState(false)
+
+  // Forgot password
+  const [forgotEmail, setForgotEmail] = useState('')
 
   // Login fields
   const [loginEmail, setLoginEmail] = useState('')
@@ -61,6 +64,24 @@ function AuthForm() {
       router.replace(redirectTo)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'שגיאה בהתחברות')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+      if (error) throw error
+      setSuccess('נשלח מייל לאיפוס סיסמא. אנא בדוק את תיבת הדואר שלך.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'שגיאה בשליחת המייל')
     } finally {
       setLoading(false)
     }
@@ -198,27 +219,66 @@ function AuthForm() {
         {/* Card */}
         <div className="card" style={{ padding: '2rem' }}>
           {/* Tabs */}
-          <div className="tab-list" style={{ marginBottom: '1.5rem' }}>
-            <button
-              className={`tab ${tab === 'login' ? 'active' : ''}`}
-              onClick={() => { setTab('login'); setError(''); setSuccess('') }}
-              style={{ flex: 1, justifyContent: 'center' }}
-            >
-              התחברות
-            </button>
-            <button
-              className={`tab ${tab === 'register' ? 'active' : ''}`}
-              onClick={() => { setTab('register'); setError(''); setSuccess('') }}
-              style={{ flex: 1, justifyContent: 'center' }}
-            >
-              הרשמה
-            </button>
-          </div>
+          {tab !== 'forgot' && (
+            <div className="tab-list" style={{ marginBottom: '1.5rem' }}>
+              <button
+                className={`tab ${tab === 'login' ? 'active' : ''}`}
+                onClick={() => { setTab('login'); setError(''); setSuccess('') }}
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                התחברות
+              </button>
+              <button
+                className={`tab ${tab === 'register' ? 'active' : ''}`}
+                onClick={() => { setTab('register'); setError(''); setSuccess('') }}
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                הרשמה
+              </button>
+            </div>
+          )}
+          {tab === 'forgot' && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1f2937', margin: '0 0 0.25rem' }}>איפוס סיסמא</h2>
+              <button
+                onClick={() => { setTab('login'); setError(''); setSuccess('') }}
+                style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '0.8125rem', cursor: 'pointer', padding: 0 }}
+              >
+                ← חזור להתחברות
+              </button>
+            </div>
+          )}
 
           {error && <div className="alert-error" style={{ marginBottom: '1rem' }}>{error}</div>}
           {success && <div className="alert-success" style={{ marginBottom: '1rem' }}>{success}</div>}
 
-          {tab === 'login' ? (
+          {tab === 'forgot' && (
+            <form onSubmit={handleForgot}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label className="label">אימייל</label>
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="your@email.com"
+                  value={forgotEmail}
+                  onChange={e => setForgotEmail(e.target.value)}
+                  required
+                  dir="ltr"
+                  style={{ textAlign: 'left' }}
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={loading}
+                style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }}
+              >
+                {loading ? 'שולח...' : 'שלח קישור לאיפוס'}
+              </button>
+            </form>
+          )}
+
+          {tab === 'login' && (
             <form onSubmit={handleLogin}>
               <div style={{ marginBottom: '1rem' }}>
                 <label className="label">אימייל</label>
@@ -233,7 +293,7 @@ function AuthForm() {
                   style={{ textAlign: 'left' }}
                 />
               </div>
-              <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1.25rem' }}>
                 <label className="label">סיסמה</label>
                 <input
                   type="password"
@@ -246,6 +306,15 @@ function AuthForm() {
                   style={{ textAlign: 'left' }}
                 />
               </div>
+              <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+                <button
+                  type="button"
+                  onClick={() => { setTab('forgot'); setError(''); setSuccess(''); setForgotEmail(loginEmail) }}
+                  style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '0.8125rem', cursor: 'pointer', padding: 0 }}
+                >
+                  שכחתי סיסמא?
+                </button>
+              </div>
               <button
                 type="submit"
                 className="btn-primary"
@@ -255,7 +324,9 @@ function AuthForm() {
                 {loading ? 'מתחבר...' : 'התחבר'}
               </button>
             </form>
-          ) : (
+          )}
+
+          {tab === 'register' && (
             <form onSubmit={handleRegister}>
               <div style={{ marginBottom: '1rem' }}>
                 <label className="label">שם מלא</label>
