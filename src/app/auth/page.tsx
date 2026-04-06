@@ -240,7 +240,7 @@ function AuthForm() {
                     checked={ilaaMemember}
                     onChange={e => setIlaaMemember(e.target.checked)}
                   />
-                  <span>חבר/ה ILAA (האיגוד הישראלי לאקטוארים)</span>
+                  <span>חבר/ה ILAA (אגודת האקטוארים בישראל)</span>
                 </label>
               </div>
               {ilaaMemember && (
