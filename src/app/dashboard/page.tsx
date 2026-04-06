@@ -131,7 +131,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
           <div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-              שלום, {getDisplayName()} 👋
+              שלום, {getDisplayName()}
             </h1>
             <p style={{ color: '#6b7280', margin: 0, fontSize: '0.875rem' }}>
               ניהול תיקי איזון משאבים
