@@ -270,9 +270,13 @@ export async function nextCaseNumber(): Promise<string> {
 }
 
 export async function loadCases(): Promise<CaseSummaryRow[]> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Not authenticated')
+
   const { data, error } = await supabase
     .from('cases_summary')
     .select('*')
+    .eq('actuary_id', session.user.id)
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
