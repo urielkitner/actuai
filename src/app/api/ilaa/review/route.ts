@@ -56,12 +56,24 @@ export async function POST(request: NextRequest) {
         <p>לצערנו, לא הצלחנו לאמת את חברותך ב-ILAA. אנא צור קשר עם התמיכה לפרטים נוספים.</p>
       </div>`
 
-  await resend.emails.send({
+  console.log('[ilaa/review] RESEND_API_KEY present:', !!process.env.RESEND_API_KEY)
+  console.log('[ilaa/review] RESEND_API_KEY prefix:', process.env.RESEND_API_KEY?.slice(0, 8))
+  console.log('[ilaa/review] Sending email to:', userEmail, 'action:', action)
+
+  const { data: emailData, error: emailError } = await resend.emails.send({
     from: 'ActuAi <onboarding@resend.dev>',
     to: userEmail,
     subject,
     html: bodyHtml,
   })
 
-  return NextResponse.json({ ok: true })
+  console.log('[ilaa/review] Resend response — data:', JSON.stringify(emailData), 'error:', JSON.stringify(emailError))
+
+  if (emailError) {
+    console.error('[ilaa/review] Resend error:', emailError)
+    // Profile was already updated — return partial success with email error details
+    return NextResponse.json({ ok: true, emailError: emailError.message, emailDetails: emailError })
+  }
+
+  return NextResponse.json({ ok: true, emailId: emailData?.id })
 }

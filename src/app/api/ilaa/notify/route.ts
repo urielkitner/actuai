@@ -6,7 +6,11 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 export async function POST(request: NextRequest) {
   const { fullName, email, idNumber } = await request.json()
 
-  const { error } = await resend.emails.send({
+  console.log('[ilaa/notify] RESEND_API_KEY present:', !!process.env.RESEND_API_KEY)
+  console.log('[ilaa/notify] RESEND_API_KEY prefix:', process.env.RESEND_API_KEY?.slice(0, 8))
+  console.log('[ilaa/notify] Sending to: aiactuar@gmail.com, from: fullName=', fullName, 'email=', email)
+
+  const { data, error } = await resend.emails.send({
     from: 'ActuAi <onboarding@resend.dev>',
     to: 'aiactuar@gmail.com',
     subject: 'בקשת אימות ILAA חדשה - ActuAi',
@@ -29,8 +33,11 @@ export async function POST(request: NextRequest) {
     `,
   })
 
+  console.log('[ilaa/notify] Resend response — data:', JSON.stringify(data), 'error:', JSON.stringify(error))
+
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[ilaa/notify] Resend error:', error)
+    return NextResponse.json({ error: error.message, details: error }, { status: 500 })
   }
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, emailId: data?.id })
 }
