@@ -92,7 +92,7 @@ export default function DashboardPage() {
           <img
             src="/logo.png"
             alt="ActuAi logo"
-            style={{ width: '36px', height: '36px', objectFit: 'contain', background: 'white', borderRadius: '12px', padding: '4px' }}
+            style={{ width: '36px', height: '36px', objectFit: 'contain' }}
           />
           <span style={{
             fontWeight: '800', fontSize: '1.125rem',
