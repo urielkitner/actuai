@@ -44,10 +44,14 @@ function AuthForm() {
       if (data.session) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('ilaa_status')
+          .select('ilaa_status, is_blocked')
           .eq('id', data.session.user.id)
           .single()
 
+        if (profile?.is_blocked) {
+          await supabase.auth.signOut()
+          throw new Error('החשבון שלך חסום. אנא פנה לתמיכה.')
+        }
         if (profile?.ilaa_status === 'pending') {
           await supabase.auth.signOut()
           throw new Error('בקשת האימות שלך עדיין בבדיקה')
