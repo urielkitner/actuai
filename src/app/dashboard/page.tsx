@@ -465,46 +465,88 @@ export default function DashboardPage() {
 
         {/* ── RIGHT SIDEBAR ── */}
         <aside style={{ width: '220px', minWidth: '220px', background: '#1a2035', display: 'flex', flexDirection: 'column', position: 'fixed', right: 0, top: 0, height: '100vh', zIndex: 100, overflowY: 'auto' }}>
+
+          {/* Logo area */}
+          <div style={{ paddingTop: '20px', paddingBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+            <img src="/logo.png" alt="ActuAi" style={{ width: '120px', objectFit: 'contain' }} />
+          </div>
+          <div style={{ height: '1px', background: '#2d3654', marginBottom: '0' }} />
+
           {/* User section */}
-          <div style={{ padding: '24px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '17px', marginBottom: '10px' }}>
+          <div style={{ padding: '16px', textAlign: 'center', borderBottom: '1px solid #2d3654' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '50%', background: '#4f46e5',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', fontWeight: 700, fontSize: '16px', margin: '0 auto',
+            }}>
               {getDisplayName().charAt(0)}
             </div>
-            <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '14px', lineHeight: 1.3 }}>{getDisplayName()}</div>
-            <div style={{ color: '#8892a4', fontWeight: 300, fontSize: '12px', marginTop: '3px' }}>אקטואר מוסמך</div>
+            <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '14px', marginTop: '10px', lineHeight: 1.3 }}>
+              {getDisplayName()}
+            </div>
+            {ilaaStatus === 'approved' && (
+              <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>
+                אקטואר מוסמך | ILAA
+              </div>
+            )}
           </div>
 
-          {/* Nav items */}
-          <nav style={{ flex: 1, padding: '12px 10px' }}>
-            {navItems.map(item => {
-              const isLogout = item.id === 'logout'
-              const isActive = !isLogout && activeSection === item.id
+          {/* Main nav items */}
+          <nav style={{ flex: 1, padding: '8px 0' }}>
+            {navItems.filter(item => item.id !== 'support' && item.id !== 'logout').map(item => {
+              const isActive = activeSection === item.id
               return (
                 <button
                   key={item.id}
-                  onClick={() => isLogout ? handleLogout() : setActiveSection(item.id)}
+                  onClick={() => setActiveSection(item.id)}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '10px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                    padding: '12px 20px', border: 'none', cursor: 'pointer',
                     background: isActive ? '#4f46e5' : 'transparent',
-                    color: isActive ? '#ffffff' : isLogout ? '#8892a4' : '#b0bac8',
+                    borderRadius: isActive ? '8px' : '0',
+                    margin: isActive ? '2px 8px' : '0',
+                    width: isActive ? 'calc(100% - 16px)' : '100%',
+                    color: isActive ? '#ffffff' : '#94a3b8',
                     fontSize: '14px', fontWeight: isActive ? 600 : 400,
-                    marginBottom: '2px', textAlign: 'right',
-                    transition: 'background 0.15s, color 0.15s',
+                    textAlign: 'right', transition: 'background 0.15s, color 0.15s',
                   }}
-                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#2d3654'; if (!isActive) e.currentTarget.style.color = '#ffffff' }}
-                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; if (!isActive) e.currentTarget.style.color = isLogout ? '#8892a4' : '#b0bac8' }}
+                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = '#2d3654'; e.currentTarget.style.color = '#ffffff' } }}
+                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' } }}
                 >
-                  <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.75 }}>{item.icon}</span>
+                  <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7 }}>{item.icon}</span>
                   {item.label}
                 </button>
               )
             })}
           </nav>
 
-          {/* Logo at bottom */}
-          <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.3)', fontSize: '13px', fontWeight: 700, textAlign: 'center' }}>
-            ActuAi
+          {/* Bottom pinned items */}
+          <div style={{ borderTop: '1px solid #2d3654', padding: '8px 0' }}>
+            {navItems.filter(item => item.id === 'support' || item.id === 'logout').map(item => {
+              const isActive = item.id !== 'logout' && activeSection === item.id
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => item.id === 'logout' ? handleLogout() : setActiveSection(item.id)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '12px 20px', border: 'none', cursor: 'pointer',
+                    background: isActive ? '#4f46e5' : 'transparent',
+                    borderRadius: isActive ? '8px' : '0',
+                    margin: isActive ? '2px 8px' : '0',
+                    width: isActive ? 'calc(100% - 16px)' : '100%',
+                    color: isActive ? '#ffffff' : '#94a3b8',
+                    fontSize: '14px', fontWeight: isActive ? 600 : 400,
+                    textAlign: 'right', transition: 'background 0.15s, color 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = '#2d3654'; e.currentTarget.style.color = '#ffffff' } }}
+                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' } }}
+                >
+                  <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7 }}>{item.icon}</span>
+                  {item.label}
+                </button>
+              )
+            })}
           </div>
         </aside>
 
