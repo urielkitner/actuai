@@ -57,6 +57,26 @@ export default function NewCasePage() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { router.replace('/auth'); return }
+
+      // Trial logic: if subscription_status is 'none', allow only 1 case
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_status')
+        .eq('id', session.user.id)
+        .single()
+
+      if (!profile || profile.subscription_status === 'none') {
+        const { count } = await supabase
+          .from('cases')
+          .select('id', { count: 'exact', head: true })
+          .eq('actuary_id', session.user.id)
+
+        if ((count ?? 0) >= 1) {
+          router.replace('/pricing?message=' + encodeURIComponent('הגעת למגבלת התיק החינמי. שדרג למנוי כדי להמשיך'))
+          return
+        }
+      }
+
       const suggested = await nextCaseNumber()
       setCaseNumber(suggested)
     })
