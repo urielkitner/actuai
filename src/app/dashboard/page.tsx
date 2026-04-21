@@ -266,47 +266,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Cases table */}
-      <div style={{ marginBottom: '20px' }}><CasesTable /></div>
-
-      {/* Bottom row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-        {/* Subscription card */}
-        <div style={{ background: '#ffffff', borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0', padding: '20px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 14px 0' }}>מנוי ותוכנית</h3>
-          <span style={{ display: 'inline-block', background: planBadge.bg, color: planBadge.color, borderRadius: '9999px', padding: '4px 12px', fontSize: '12px', fontWeight: 600, marginBottom: '14px' }}>
-            {PLAN_LABELS[subscriptionStatus]}
-          </span>
-          {isFree ? (
-            <>
-              <p style={{ fontSize: '13px', color: '#6b7280', fontWeight: 300, margin: '0 0 8px 0' }}>{cases.length} מתוך 1 תיקים חינמיים בשימוש</p>
-              <div style={{ background: '#f1f5f9', borderRadius: '9999px', height: '5px', marginBottom: '16px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', borderRadius: '9999px', background: usedRatio >= 1 ? '#dc2626' : '#4f46e5', width: `${usedRatio * 100}%`, transition: 'width 0.4s' }} />
-              </div>
-            </>
-          ) : (
-            <p style={{ fontSize: '13px', color: '#6b7280', fontWeight: 300, margin: '0 0 16px 0' }}>{cases.length} תיקים פעילים</p>
-          )}
-          <button onClick={() => setActiveSection('subscription')} style={{ width: '100%', padding: '8px', borderRadius: '8px', background: 'none', border: '1.5px solid #4f46e5', color: '#4f46e5', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            {isFree ? 'שדרג מנוי' : 'נהל מנוי'}
-          </button>
-        </div>
-
-        {/* Support card */}
-        <div style={{ background: '#ffffff', borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0', padding: '20px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 14px 0' }}>צור קשר ותמיכה</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
-            <a href="tel:0502488805" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: '#f9fafb', textDecoration: 'none', color: '#374151', fontSize: '13px', fontWeight: 500 }}>
-              📞 050-248-8805
-            </a>
-            <a href="mailto:aiactuar@gmail.com" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: '#f9fafb', textDecoration: 'none', color: '#374151', fontSize: '13px', fontWeight: 500 }}>
-              ✉️ aiactuar@gmail.com
-            </a>
-          </div>
-          <a href="https://wa.me/972502488805" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '9px', borderRadius: '8px', background: '#25d366', color: 'white', fontSize: '13px', fontWeight: 700, textDecoration: 'none', boxSizing: 'border-box' }}>
-            💬 WhatsApp
-          </a>
-        </div>
-      </div>
+      <CasesTable />
     </>
   )
 
