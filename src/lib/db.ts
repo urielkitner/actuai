@@ -44,6 +44,7 @@ export interface BusinessRow {
   id: string; companyName: string; ownershipPercent: number; value: number
   appraised: boolean; foundedDate: string; party: 'A' | 'B'
   balanceable: Balanceable; balancePercent: number
+  companyId: string; ownershipA: number; ownershipB: number
 }
 
 export interface SimpleRow {
@@ -128,6 +129,9 @@ function dbToBusiness(r: DbAsset): BusinessRow {
     party,
     balanceable: r.is_balanceable ? 'balanceable' : 'excluded',
     balancePercent: Number(r.equalization_percentage),
+    companyId: (r.metadata?.company_id as string) ?? '',
+    ownershipA: Number(r.metadata?.ownership_a ?? 0),
+    ownershipB: Number(r.metadata?.ownership_b ?? 0),
   }
 }
 
@@ -212,7 +216,11 @@ function businessToDb(r: BusinessRow, caseId: string): Omit<DbAsset, 'metadata'>
     ownership_percentage: r.ownershipPercent,
     is_appraised: r.appraised,
     founded_date: r.foundedDate || null,
-    metadata: {},
+    metadata: {
+      company_id: r.companyId || null,
+      ownership_a: r.ownershipA,
+      ownership_b: r.ownershipB,
+    },
   }
 }
 

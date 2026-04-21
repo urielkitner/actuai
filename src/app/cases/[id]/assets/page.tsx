@@ -26,6 +26,7 @@ const defaultPension = (): PensionRow => ({
 const defaultBusiness = (): BusinessRow => ({
   id: crypto.randomUUID(), companyName: '', ownershipPercent: 100, value: 0,
   appraised: false, foundedDate: '', party: 'A', balanceable: 'balanceable', balancePercent: 50,
+  companyId: '', ownershipA: 0, ownershipB: 0,
 })
 const defaultSimple = (): SimpleRow => ({
   id: crypto.randomUUID(), name: '', valueA: 0, valueB: 0, balanceable: 'balanceable', balancePercent: 50,
@@ -299,45 +300,76 @@ function BusinessTable({ rows, onUpdate, onAdd, onRemove }: BusinessTableProps) 
           <table>
             <thead>
               <tr>
-                <th>שם חברה</th><th>% בעלות</th><th>שווי (₪)</th>
-                <th>הוערך ע&quot;י שמאי</th><th>תאריך הקמה</th><th>צד</th>
+                <th>שם חברה</th><th>ח.פ / ע.מ</th><th>בעלות צד א (%)</th><th>בעלות צד ב (%)</th>
+                <th>שווי (₪)</th><th>הוערך ע&quot;י שמאי</th><th>תאריך הקמה</th><th>צד</th>
                 <th>בר-איזון</th><th>% איזון</th><th></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={r.id}>
-                  <td><Inp value={r.companyName} onChange={v => onUpdate(i, 'companyName', v)} placeholder="שם החברה" /></td>
-                  <td><Inp type="number" value={r.ownershipPercent} onChange={v => onUpdate(i, 'ownershipPercent', Number(v))} dir="ltr" /></td>
-                  <td><Inp type="number" value={r.value} onChange={v => onUpdate(i, 'value', Number(v))} dir="ltr" /></td>
-                  <td>
-                    <select
-                      className="input"
-                      value={r.appraised ? 'yes' : 'no'}
-                      onChange={e => onUpdate(i, 'appraised', e.target.value === 'yes')}
-                      style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem' }}
-                    >
-                      <option value="yes">כן</option>
-                      <option value="no">לא</option>
-                    </select>
-                  </td>
-                  <td><Inp type="date" value={r.foundedDate} onChange={v => onUpdate(i, 'foundedDate', v)} dir="ltr" /></td>
-                  <td>
-                    <Sel value={r.party} onChange={v => onUpdate(i, 'party', v)} options={[
-                      { value: 'A', label: 'צד א' },
-                      { value: 'B', label: 'צד ב' },
-                    ]} />
-                  </td>
-                  <td>
-                    <Sel value={r.balanceable} onChange={v => onUpdate(i, 'balanceable', v)} options={[
-                      { value: 'balanceable', label: 'בר-איזון' },
-                      { value: 'excluded', label: 'מוחרג' },
-                    ]} />
-                  </td>
-                  <td><Inp type="number" value={r.balancePercent} onChange={v => onUpdate(i, 'balancePercent', Number(v))} dir="ltr" /></td>
-                  <td><DeleteBtn onClick={() => onRemove(i)} /></td>
-                </tr>
-              ))}
+              {rows.map((r, i) => {
+                const ownershipOver100 = r.ownershipA + r.ownershipB > 100
+                return (
+                  <tr key={r.id}>
+                    <td><Inp value={r.companyName} onChange={v => onUpdate(i, 'companyName', v)} placeholder="שם החברה" /></td>
+                    <td>
+                      <input
+                        type="text"
+                        className="input"
+                        value={r.companyId}
+                        onChange={e => onUpdate(i, 'companyId', e.target.value.replace(/\D/g, '').slice(0, 9))}
+                        placeholder="000000000"
+                        dir="ltr"
+                        maxLength={9}
+                        style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem', minWidth: '100px', textAlign: 'left' }}
+                      />
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Inp type="number" value={r.ownershipA} onChange={v => onUpdate(i, 'ownershipA', Math.min(100, Math.max(0, Number(v))))} dir="ltr" />
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>%</span>
+                      </div>
+                      {ownershipOver100 && (
+                        <div style={{ fontSize: '0.7rem', color: '#dc2626', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                          סך האחוזים עולה על 100%
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Inp type="number" value={r.ownershipB} onChange={v => onUpdate(i, 'ownershipB', Math.min(100, Math.max(0, Number(v))))} dir="ltr" />
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>%</span>
+                      </div>
+                    </td>
+                    <td><Inp type="number" value={r.value} onChange={v => onUpdate(i, 'value', Number(v))} dir="ltr" /></td>
+                    <td>
+                      <select
+                        className="input"
+                        value={r.appraised ? 'yes' : 'no'}
+                        onChange={e => onUpdate(i, 'appraised', e.target.value === 'yes')}
+                        style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem' }}
+                      >
+                        <option value="yes">כן</option>
+                        <option value="no">לא</option>
+                      </select>
+                    </td>
+                    <td><Inp type="date" value={r.foundedDate} onChange={v => onUpdate(i, 'foundedDate', v)} dir="ltr" /></td>
+                    <td>
+                      <Sel value={r.party} onChange={v => onUpdate(i, 'party', v)} options={[
+                        { value: 'A', label: 'צד א' },
+                        { value: 'B', label: 'צד ב' },
+                      ]} />
+                    </td>
+                    <td>
+                      <Sel value={r.balanceable} onChange={v => onUpdate(i, 'balanceable', v)} options={[
+                        { value: 'balanceable', label: 'בר-איזון' },
+                        { value: 'excluded', label: 'מוחרג' },
+                      ]} />
+                    </td>
+                    <td><Inp type="number" value={r.balancePercent} onChange={v => onUpdate(i, 'balancePercent', Number(v))} dir="ltr" /></td>
+                    <td><DeleteBtn onClick={() => onRemove(i)} /></td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
