@@ -20,14 +20,37 @@ const STATUS_COLORS: Record<CaseStatus, { bg: string; color: string }> = {
   pending: { bg: '#fef9c3', color: '#ca8a04' },
 }
 
+type SubscriptionStatus = 'none' | 'active' | 'expired'
+
+const PLAN_LABELS: Record<SubscriptionStatus, string> = {
+  none:    'ניסיון חינם',
+  active:  'מנוי פעיל',
+  expired: 'מנוי פג תוקף',
+}
+
+const PLAN_COLORS: Record<SubscriptionStatus, { bg: string; color: string; border: string }> = {
+  none:    { bg: '#fef3c7', color: '#92400e', border: '#f59e0b' },
+  active:  { bg: '#dcfce7', color: '#166534', border: '#16a34a' },
+  expired: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444' },
+}
+
+const WELCOME_DISMISSED_KEY = 'actuai_welcome_dismissed'
+
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [cases, setCases] = useState<CaseSummaryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('none')
+  const [welcomeDismissed, setWelcomeDismissed] = useState(true)
 
   useEffect(() => {
+    // Check localStorage for welcome banner dismissal
+    if (typeof window !== 'undefined') {
+      setWelcomeDismissed(!!localStorage.getItem(WELCOME_DISMISSED_KEY))
+    }
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         router.replace('/auth')
@@ -35,8 +58,12 @@ export default function DashboardPage() {
       }
       setUser(session.user)
       try {
-        const rows = await loadCases()
-        setCases(rows)
+        const [casesResult, profileResult] = await Promise.all([
+          loadCases(),
+          supabase.from('profiles').select('subscription_status').eq('id', session.user.id).single(),
+        ])
+        setCases(casesResult)
+        setSubscriptionStatus((profileResult.data?.subscription_status ?? 'none') as SubscriptionStatus)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'שגיאה בטעינת התיקים')
       } finally {
@@ -57,6 +84,11 @@ export default function DashboardPage() {
     } catch {
       // silently ignore — the status badge is just cosmetic here
     }
+  }
+
+  const dismissWelcome = () => {
+    localStorage.setItem(WELCOME_DISMISSED_KEY, '1')
+    setWelcomeDismissed(true)
   }
 
   const getDisplayName = () => {
@@ -80,6 +112,9 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  const planColors = PLAN_COLORS[subscriptionStatus]
+  const isFree = subscriptionStatus === 'none'
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
@@ -148,6 +183,39 @@ export default function DashboardPage() {
 
         {error && <div className="alert-error" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
+        {/* Welcome banner — shown only for new users with 0 cases */}
+        {cases.length === 0 && !welcomeDismissed && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ede9fe, #e0e7ff)',
+            border: '1px solid #c4b5fd',
+            borderRadius: '0.75rem',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.5rem' }}>👋</span>
+              <span style={{ fontWeight: '600', color: '#4338ca', fontSize: '0.9375rem' }}>
+                ברוכים הבאים ל-ActuAi! לחץ על &quot;+ תיק חדש&quot; כדי להתחיל
+              </span>
+            </div>
+            <button
+              onClick={dismissWelcome}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#6366f1', fontSize: '1.125rem', lineHeight: 1,
+                padding: '0.25rem', flexShrink: 0,
+              }}
+              title="סגור"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Stats cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
           <StatCard label='סה"כ תיקים' value={cases.length} color="#6366f1" icon="📁" />
@@ -157,7 +225,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Cases table */}
-        <div className="card" style={{ padding: '1.5rem' }}>
+        <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
               תיקים אחרונים
@@ -205,7 +273,6 @@ export default function DashboardPage() {
                           : <span style={{ color: '#d1d5db' }}>—</span>}
                       </td>
                       <td>
-                        {/* Clickable status badge cycles through statuses */}
                         <span
                           className="badge"
                           style={{
@@ -237,6 +304,114 @@ export default function DashboardPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Bottom cards row: Subscription + Support */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+
+          {/* Subscription status card */}
+          <div className="card" style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '1.25rem' }}>💳</span>
+              <h2 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
+                מנוי ותוכנית
+              </h2>
+            </div>
+
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+              background: planColors.bg, color: planColors.color,
+              border: `1px solid ${planColors.border}`,
+              borderRadius: '9999px', padding: '0.375rem 0.875rem',
+              fontSize: '0.875rem', fontWeight: '700', marginBottom: '1rem',
+            }}>
+              <span style={{
+                width: '7px', height: '7px', borderRadius: '50%',
+                background: planColors.color, flexShrink: 0,
+              }} />
+              {PLAN_LABELS[subscriptionStatus]}
+            </div>
+
+            {isFree && (
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 1.25rem 0' }}>
+                {cases.length} מתוך 1 תיקים חינמיים בשימוש
+              </p>
+            )}
+            {!isFree && (
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 1.25rem 0' }}>
+                {cases.length} תיקים פעילים
+              </p>
+            )}
+
+            <button
+              className="btn-primary"
+              onClick={() => router.push('/pricing')}
+              style={{ width: '100%', padding: '0.625rem', justifyContent: 'center', fontSize: '0.875rem' }}
+            >
+              {isFree ? 'שדרג מנוי' : 'נהל מנוי'}
+            </button>
+          </div>
+
+          {/* Support card */}
+          <div className="card" style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '1.25rem' }}>🎧</span>
+              <h2 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
+                צור קשר ותמיכה
+              </h2>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <a
+                href="tel:0502488805"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.625rem',
+                  color: '#374151', textDecoration: 'none', fontSize: '0.9rem',
+                  fontWeight: '500',
+                }}
+              >
+                <span style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  background: '#f0fdf4', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: '0.875rem', flexShrink: 0,
+                }}>📞</span>
+                050-248-8805
+              </a>
+
+              <a
+                href="mailto:aiactuar@gmail.com"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.625rem',
+                  color: '#374151', textDecoration: 'none', fontSize: '0.9rem',
+                  fontWeight: '500',
+                }}
+              >
+                <span style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  background: '#eff6ff', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: '0.875rem', flexShrink: 0,
+                }}>✉️</span>
+                aiactuar@gmail.com
+              </a>
+            </div>
+
+            <a
+              href="https://wa.me/972502488805"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                width: '100%', padding: '0.625rem',
+                background: '#25d366', color: 'white',
+                border: 'none', borderRadius: '0.5rem', cursor: 'pointer',
+                fontWeight: '700', fontSize: '0.875rem', textDecoration: 'none',
+                boxSizing: 'border-box',
+              }}
+            >
+              <span>💬</span>
+              WhatsApp
+            </a>
           </div>
         </div>
       </main>
