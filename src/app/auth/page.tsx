@@ -61,7 +61,11 @@ function AuthForm() {
         }
       }
 
-      router.replace(redirectTo)
+      if (data.session.user.email === 'aiactuar@gmail.com') {
+        router.replace('/admin')
+      } else {
+        router.replace(redirectTo)
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'שגיאה בהתחברות')
     } finally {
