@@ -8,6 +8,14 @@ import type { CaseSummaryRow, CaseStatus } from '@/lib/db'
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
 
+// ── Google Fonts: Heebo ────────────────────────────────────────────────────────
+const heeboStyle = `
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+  * { font-family: 'Heebo', sans-serif; }
+`
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
 const STATUS_LABELS: Record<CaseStatus, string> = {
   open: 'פתוח',
   closed: 'סגור',
@@ -28,13 +36,15 @@ const PLAN_LABELS: Record<SubscriptionStatus, string> = {
   expired: 'מנוי פג תוקף',
 }
 
-const PLAN_COLORS: Record<SubscriptionStatus, { bg: string; color: string; border: string }> = {
-  none:    { bg: '#fef3c7', color: '#92400e', border: '#f59e0b' },
-  active:  { bg: '#dcfce7', color: '#166534', border: '#16a34a' },
-  expired: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444' },
+const PLAN_BADGE: Record<SubscriptionStatus, { bg: string; color: string }> = {
+  none:    { bg: '#f1f5f9', color: '#64748b' },
+  active:  { bg: '#dcfce7', color: '#16a34a' },
+  expired: { bg: '#fee2e2', color: '#dc2626' },
 }
 
 const WELCOME_DISMISSED_KEY = 'actuai_welcome_dismissed'
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -46,16 +56,12 @@ export default function DashboardPage() {
   const [welcomeDismissed, setWelcomeDismissed] = useState(true)
 
   useEffect(() => {
-    // Check localStorage for welcome banner dismissal
     if (typeof window !== 'undefined') {
       setWelcomeDismissed(!!localStorage.getItem(WELCOME_DISMISSED_KEY))
     }
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
-        router.replace('/auth')
-        return
-      }
+      if (!session) { router.replace('/auth'); return }
       setUser(session.user)
       try {
         const [casesResult, profileResult] = await Promise.all([
@@ -81,9 +87,7 @@ export default function DashboardPage() {
     try {
       await updateCaseStatus(caseId, status)
       setCases(prev => prev.map(c => c.id === caseId ? { ...c, status } : c))
-    } catch {
-      // silently ignore — the status badge is just cosmetic here
-    }
+    } catch { /* silent */ }
   }
 
   const dismissWelcome = () => {
@@ -107,177 +111,217 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
-        <div style={{ textAlign: 'center', color: '#6b7280' }}>טוען...</div>
-      </div>
+      <>
+        <style>{heeboStyle}</style>
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+          <div style={{ color: '#9ca3af', fontSize: '14px', fontWeight: 300 }}>טוען...</div>
+        </div>
+      </>
     )
   }
 
-  const planColors = PLAN_COLORS[subscriptionStatus]
   const isFree = subscriptionStatus === 'none'
+  const planBadge = PLAN_BADGE[subscriptionStatus]
+  const usedRatio = isFree ? Math.min(cases.length / 1, 1) : 0
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      {/* Navbar */}
-      <nav style={{
-        background: 'white', borderBottom: '1px solid #e5e7eb', padding: '0 1.5rem',
-        height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)',
-      }}>
-        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
-          <img
-            src="/logo.png"
-            alt="ActuAi logo"
-            style={{ width: '36px', height: '36px', objectFit: 'contain' }}
-          />
-          <span style={{
-            fontWeight: '800', fontSize: '1.125rem',
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-          }}>ActuAi</span>
-        </Link>
+    <>
+      <style>{heeboStyle}</style>
+      <div style={{ minHeight: '100vh', background: '#f4f6fb' }}>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{
-              width: '32px', height: '32px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: '0.875rem', fontWeight: '700',
-            }}>
-              {getDisplayName().charAt(0)}
-            </div>
-            <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
-              {getDisplayName()}
-            </span>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="btn-secondary"
-            style={{ padding: '0.375rem 0.875rem', fontSize: '0.8125rem' }}
-          >
-            התנתק
-          </button>
-        </div>
-      </nav>
+        {/* ── Navbar ── */}
+        <nav style={{
+          background: '#ffffff',
+          borderBottom: '1px solid #e5e7eb',
+          padding: '0 2rem',
+          height: '60px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        }}>
+          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+            <img src="/logo.png" alt="ActuAi" style={{ width: '34px', height: '34px', objectFit: 'contain' }} />
+            <span style={{
+              fontWeight: 700, fontSize: '17px',
+              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            }}>ActuAi</span>
+          </Link>
 
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1f2937', margin: '0 0 0.25rem 0' }}>
-              שלום, {getDisplayName()}
-            </h1>
-            <p style={{ color: '#6b7280', margin: 0, fontSize: '0.875rem' }}>
-              ניהול תיקי איזון משאבים
-            </p>
-          </div>
-          <button
-            className="btn-primary"
-            onClick={() => router.push('/cases/new')}
-            style={{ padding: '0.75rem 1.5rem', fontSize: '1rem' }}
-          >
-            + תיק חדש
-          </button>
-        </div>
-
-        {error && <div className="alert-error" style={{ marginBottom: '1.5rem' }}>{error}</div>}
-
-        {/* Welcome banner — shown only for new users with 0 cases */}
-        {cases.length === 0 && !welcomeDismissed && (
-          <div style={{
-            background: 'linear-gradient(135deg, #ede9fe, #e0e7ff)',
-            border: '1px solid #c4b5fd',
-            borderRadius: '0.75rem',
-            padding: '1rem 1.25rem',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>👋</span>
-              <span style={{ fontWeight: '600', color: '#4338ca', fontSize: '0.9375rem' }}>
-                ברוכים הבאים ל-ActuAi! לחץ על &quot;+ תיק חדש&quot; כדי להתחיל
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '30px', height: '30px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'white', fontSize: '13px', fontWeight: 700,
+              }}>
+                {getDisplayName().charAt(0)}
+              </div>
+              <span style={{ fontSize: '14px', fontWeight: 500, color: '#374151' }}>
+                {getDisplayName()}
               </span>
             </div>
             <button
-              onClick={dismissWelcome}
+              onClick={handleLogout}
               style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: '#6366f1', fontSize: '1.125rem', lineHeight: 1,
-                padding: '0.25rem', flexShrink: 0,
+                background: 'none', border: '1px solid #e5e7eb', borderRadius: '8px',
+                padding: '6px 14px', fontSize: '13px', fontWeight: 500,
+                color: '#6b7280', cursor: 'pointer',
               }}
-              title="סגור"
             >
-              ✕
+              התנתק
             </button>
           </div>
-        )}
+        </nav>
 
-        {/* Stats cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-          <StatCard label='סה"כ תיקים' value={cases.length} color="#6366f1" icon="📁" />
-          <StatCard label="תיקים פתוחים"  value={cases.filter(c => c.status === 'open').length}   color="#10b981" icon="✅" />
-          <StatCard label="תיקים סגורים"  value={cases.filter(c => c.status === 'closed').length} color="#64748b" icon="🔒" />
-          <StatCard label="תיקים החודש"   value={thisMonthCases}                                   color="#f59e0b" icon="📅" />
-        </div>
+        {/* ── Main ── */}
+        <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
 
-        {/* Cases table */}
-        <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
-              תיקים אחרונים
-            </h2>
-            <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>{cases.length} תיקים</span>
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
+            <div>
+              <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 4px 0', lineHeight: 1.2 }}>
+                שלום, {getDisplayName()}
+              </h1>
+              <p style={{ fontSize: '14px', fontWeight: 300, color: '#6b7280', margin: 0 }}>
+                ניהול תיקי איזון משאבים
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/cases/new')}
+              style={{
+                background: '#4f46e5', color: 'white',
+                border: 'none', borderRadius: '10px',
+                padding: '10px 22px', fontSize: '15px', fontWeight: 600,
+                cursor: 'pointer', whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(79,70,229,0.25)',
+              }}
+            >
+              + תיק חדש
+            </button>
           </div>
 
-          <div className="table-container">
-            <table>
+          {error && (
+            <div style={{
+              background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '10px',
+              padding: '12px 16px', marginBottom: '20px', color: '#dc2626', fontSize: '14px',
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Welcome banner */}
+          {cases.length === 0 && !welcomeDismissed && (
+            <div style={{
+              background: '#f0f4ff',
+              borderRight: '4px solid #4f46e5',
+              borderRadius: '10px',
+              padding: '14px 20px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+            }}>
+              <span style={{ fontSize: '15px', fontWeight: 500, color: '#3730a3' }}>
+                ברוכים הבאים ל-ActuAi! לחץ על &quot;+ תיק חדש&quot; כדי להתחיל
+              </span>
+              <button
+                onClick={dismissWelcome}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: '#6366f1', fontSize: '16px', lineHeight: 1,
+                  padding: '2px 6px', flexShrink: 0, fontWeight: 500,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Stats row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+            <StatCard label='סה"כ תיקים'    value={cases.length}                                    accentColor="#4f46e5" />
+            <StatCard label="תיקים פתוחים"  value={cases.filter(c => c.status === 'open').length}   accentColor="#16a34a" />
+            <StatCard label="תיקים סגורים"  value={cases.filter(c => c.status === 'closed').length} accentColor="#dc2626" />
+            <StatCard label="תיקים החודש"   value={thisMonthCases}                                   accentColor="#2563eb" />
+          </div>
+
+          {/* Cases table */}
+          <div style={{
+            background: '#ffffff', borderRadius: '12px',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0',
+            marginBottom: '24px', overflow: 'hidden',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '16px 20px', borderBottom: '1px solid #f0f0f0',
+            }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e', margin: 0 }}>
+                תיקים אחרונים
+              </h2>
+              <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 300 }}>{cases.length} תיקים</span>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr>
-                  <th>מספר תיק</th>
-                  <th>שמות הצדדים</th>
-                  <th>תאריך פתיחה</th>
-                  <th>נכסים</th>
-                  <th>סטטוס</th>
-                  <th>פעולות</th>
+                <tr style={{ background: '#f9fafb' }}>
+                  {['מספר תיק', 'שמות הצדדים', 'תאריך פתיחה', 'נכסים', 'סטטוס', 'פעולות'].map(h => (
+                    <th key={h} style={{
+                      padding: '10px 16px', textAlign: 'right', fontSize: '13px',
+                      fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #f0f0f0',
+                    }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {cases.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '48px', fontSize: '14px', fontWeight: 300 }}>
                       אין תיקים עדיין. לחץ על &quot;+ תיק חדש&quot; כדי להתחיל.
                     </td>
                   </tr>
                 ) : (
-                  cases.map(c => (
+                  cases.map((c, i) => (
                     <tr
                       key={c.id}
-                      style={{ cursor: 'pointer' }}
+                      style={{
+                        cursor: 'pointer',
+                        borderBottom: i < cases.length - 1 ? '1px solid #f9fafb' : 'none',
+                        transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       onClick={() => router.push(`/cases/${c.id}/assets`)}
                     >
-                      <td>
-                        <span style={{ fontWeight: '600', color: '#6366f1' }}>{c.caseNumber}</span>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: '14px' }}>{c.caseNumber}</span>
                       </td>
-                      <td>
-                        <div style={{ fontWeight: '500' }}>{c.partyAName}</div>
-                        <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>{c.partyBName}</div>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontWeight: 500, color: '#1a1a2e', fontSize: '14px' }}>{c.partyAName}</div>
+                        <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 300, marginTop: '2px' }}>{c.partyBName}</div>
                       </td>
-                      <td style={{ color: '#6b7280' }}>{formatDate(c.createdAt)}</td>
-                      <td style={{ color: '#6b7280', fontSize: '0.8125rem' }}>
-                        {c.assetCount > 0
-                          ? `${c.assetCount} נכסים`
-                          : <span style={{ color: '#d1d5db' }}>—</span>}
+                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: '13px', fontWeight: 300 }}>
+                        {formatDate(c.createdAt)}
                       </td>
-                      <td>
+                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: '13px', fontWeight: 300 }}>
+                        {c.assetCount > 0 ? `${c.assetCount} נכסים` : <span style={{ color: '#d1d5db' }}>—</span>}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
                         <span
-                          className="badge"
                           style={{
+                            display: 'inline-block',
                             background: STATUS_COLORS[c.status].bg,
                             color: STATUS_COLORS[c.status].color,
+                            borderRadius: '9999px',
+                            padding: '3px 10px',
+                            fontSize: '12px',
+                            fontWeight: 600,
                             cursor: 'pointer',
                           }}
                           onClick={e => {
@@ -290,11 +334,14 @@ export default function DashboardPage() {
                           {STATUS_LABELS[c.status]}
                         </span>
                       </td>
-                      <td>
+                      <td style={{ padding: '12px 16px' }}>
                         <button
-                          className="btn-secondary"
                           onClick={e => { e.stopPropagation(); router.push(`/cases/${c.id}/assets`) }}
-                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.8125rem' }}
+                          style={{
+                            background: 'none', border: '1px solid #e5e7eb', borderRadius: '7px',
+                            padding: '4px 12px', fontSize: '12px', fontWeight: 500,
+                            color: '#374151', cursor: 'pointer',
+                          }}
                         >
                           פתח
                         </button>
@@ -305,135 +352,129 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-        </div>
 
-        {/* Bottom cards row: Subscription + Support */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          {/* Bottom row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
-          {/* Subscription status card */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.25rem' }}>
-              <span style={{ fontSize: '1.25rem' }}>💳</span>
-              <h2 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
+            {/* Subscription card */}
+            <div style={{
+              background: '#ffffff', borderRadius: '12px',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0',
+              padding: '20px',
+            }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 16px 0' }}>
                 מנוי ותוכנית
               </h2>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <span style={{
+                  background: planBadge.bg, color: planBadge.color,
+                  borderRadius: '9999px', padding: '4px 12px',
+                  fontSize: '13px', fontWeight: 600,
+                }}>
+                  {PLAN_LABELS[subscriptionStatus]}
+                </span>
+              </div>
+
+              {isFree && (
+                <>
+                  <p style={{ fontSize: '13px', color: '#6b7280', fontWeight: 300, margin: '0 0 8px 0' }}>
+                    {cases.length} מתוך 1 תיקים חינמיים בשימוש
+                  </p>
+                  <div style={{ background: '#f1f5f9', borderRadius: '9999px', height: '6px', marginBottom: '16px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: '9999px',
+                      background: usedRatio >= 1 ? '#dc2626' : '#4f46e5',
+                      width: `${usedRatio * 100}%`,
+                      transition: 'width 0.4s ease',
+                    }} />
+                  </div>
+                </>
+              )}
+              {!isFree && (
+                <p style={{ fontSize: '13px', color: '#6b7280', fontWeight: 300, margin: '0 0 16px 0' }}>
+                  {cases.length} תיקים פעילים
+                </p>
+              )}
+
+              <button
+                onClick={() => router.push('/pricing')}
+                style={{
+                  width: '100%', padding: '9px', borderRadius: '9px',
+                  background: 'none', border: '1.5px solid #4f46e5', color: '#4f46e5',
+                  fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {isFree ? 'שדרג מנוי' : 'נהל מנוי'}
+              </button>
             </div>
 
+            {/* Support card */}
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-              background: planColors.bg, color: planColors.color,
-              border: `1px solid ${planColors.border}`,
-              borderRadius: '9999px', padding: '0.375rem 0.875rem',
-              fontSize: '0.875rem', fontWeight: '700', marginBottom: '1rem',
+              background: '#ffffff', borderRadius: '12px',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0',
+              padding: '20px',
             }}>
-              <span style={{
-                width: '7px', height: '7px', borderRadius: '50%',
-                background: planColors.color, flexShrink: 0,
-              }} />
-              {PLAN_LABELS[subscriptionStatus]}
-            </div>
-
-            {isFree && (
-              <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 1.25rem 0' }}>
-                {cases.length} מתוך 1 תיקים חינמיים בשימוש
-              </p>
-            )}
-            {!isFree && (
-              <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 1.25rem 0' }}>
-                {cases.length} תיקים פעילים
-              </p>
-            )}
-
-            <button
-              className="btn-primary"
-              onClick={() => router.push('/pricing')}
-              style={{ width: '100%', padding: '0.625rem', justifyContent: 'center', fontSize: '0.875rem' }}
-            >
-              {isFree ? 'שדרג מנוי' : 'נהל מנוי'}
-            </button>
-          </div>
-
-          {/* Support card */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.25rem' }}>
-              <span style={{ fontSize: '1.25rem' }}>🎧</span>
-              <h2 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 16px 0' }}>
                 צור קשר ותמיכה
               </h2>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                <a href="tel:0502488805" style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '10px 12px', borderRadius: '9px', background: '#f9fafb',
+                  textDecoration: 'none', color: '#374151', fontSize: '14px', fontWeight: 500,
+                }}>
+                  <span style={{ fontSize: '16px' }}>📞</span>
+                  050-248-8805
+                </a>
+                <a href="mailto:aiactuar@gmail.com" style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '10px 12px', borderRadius: '9px', background: '#f9fafb',
+                  textDecoration: 'none', color: '#374151', fontSize: '14px', fontWeight: 500,
+                }}>
+                  <span style={{ fontSize: '16px' }}>✉️</span>
+                  aiactuar@gmail.com
+                </a>
+              </div>
+
               <a
-                href="tel:0502488805"
+                href="https://wa.me/972502488805"
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '0.625rem',
-                  color: '#374151', textDecoration: 'none', fontSize: '0.9rem',
-                  fontWeight: '500',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  width: '100%', padding: '9px', borderRadius: '9px',
+                  background: '#25d366', color: 'white',
+                  fontSize: '14px', fontWeight: 700, textDecoration: 'none',
+                  boxSizing: 'border-box',
                 }}
               >
-                <span style={{
-                  width: '32px', height: '32px', borderRadius: '8px',
-                  background: '#f0fdf4', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: '0.875rem', flexShrink: 0,
-                }}>📞</span>
-                050-248-8805
-              </a>
-
-              <a
-                href="mailto:aiactuar@gmail.com"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.625rem',
-                  color: '#374151', textDecoration: 'none', fontSize: '0.9rem',
-                  fontWeight: '500',
-                }}
-              >
-                <span style={{
-                  width: '32px', height: '32px', borderRadius: '8px',
-                  background: '#eff6ff', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: '0.875rem', flexShrink: 0,
-                }}>✉️</span>
-                aiactuar@gmail.com
+                💬 WhatsApp
               </a>
             </div>
-
-            <a
-              href="https://wa.me/972502488805"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                width: '100%', padding: '0.625rem',
-                background: '#25d366', color: 'white',
-                border: 'none', borderRadius: '0.5rem', cursor: 'pointer',
-                fontWeight: '700', fontSize: '0.875rem', textDecoration: 'none',
-                boxSizing: 'border-box',
-              }}
-            >
-              <span>💬</span>
-              WhatsApp
-            </a>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </>
   )
 }
 
-function StatCard({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) {
+// ── StatCard ───────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, accentColor }: { label: string; value: number; accentColor: string }) {
   return (
-    <div className="card" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-      <div style={{
-        width: '48px', height: '48px', borderRadius: '12px',
-        background: `${color}18`, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', fontSize: '1.375rem', flexShrink: 0,
-      }}>
-        {icon}
+    <div style={{
+      background: '#ffffff', borderRadius: '12px',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0',
+      padding: '20px 20px 20px 16px',
+      borderRight: `4px solid ${accentColor}`,
+    }}>
+      <div style={{ fontSize: '32px', fontWeight: 700, color: '#1a1a2e', lineHeight: 1, marginBottom: '6px' }}>
+        {value}
       </div>
-      <div>
-        <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1f2937', lineHeight: 1 }}>
-          {value}
-        </div>
-        <div style={{ fontSize: '0.8125rem', color: '#6b7280', marginTop: '0.25rem' }}>{label}</div>
+      <div style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 300 }}>
+        {label}
       </div>
     </div>
   )
