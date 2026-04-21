@@ -500,7 +500,7 @@ export default function DashboardPage() {
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
                   style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                    display: 'flex', alignItems: 'center', gap: '10px',
                     padding: '12px 20px', border: 'none', cursor: 'pointer',
                     background: isActive ? '#4f46e5' : 'transparent',
                     borderRadius: isActive ? '8px' : '0',
@@ -529,7 +529,7 @@ export default function DashboardPage() {
                   key={item.id}
                   onClick={() => item.id === 'logout' ? handleLogout() : setActiveSection(item.id)}
                   style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                    display: 'flex', alignItems: 'center', gap: '10px',
                     padding: '12px 20px', border: 'none', cursor: 'pointer',
                     background: isActive ? '#4f46e5' : 'transparent',
                     borderRadius: isActive ? '8px' : '0',
