@@ -467,8 +467,11 @@ export default function DashboardPage() {
         <aside style={{ width: '220px', minWidth: '220px', background: '#1a2035', display: 'flex', flexDirection: 'column', position: 'fixed', right: 0, top: 0, height: '100vh', zIndex: 100, overflowY: 'auto' }}>
 
           {/* Logo area */}
-          <div style={{ paddingTop: '20px', paddingBottom: '16px', display: 'flex', justifyContent: 'center' }}>
-            <img src="/logo.png" alt="ActuAi" style={{ width: '120px', objectFit: 'contain' }} />
+          <div style={{ padding: '20px 16px 16px', textAlign: 'center' }}>
+            <span style={{ fontSize: '22px', fontWeight: '800', color: 'white', fontFamily: 'Heebo, sans-serif', letterSpacing: '-0.5px' }}>
+              ActuAi
+              <span style={{ color: '#4f46e5', fontSize: '26px', lineHeight: 1 }}>.</span>
+            </span>
           </div>
           <div style={{ height: '1px', background: '#2d3654', marginBottom: '0' }} />
 
