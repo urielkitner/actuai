@@ -53,6 +53,19 @@ export interface SimpleRow {
   balanceable: Balanceable; balancePercent: number
 }
 
+export interface SecuritiesRow {
+  id: string; name: string; securityType: string; party: 'A' | 'B'
+  marketValue: number; costBasis: number; taxRate: number; expiryDate: string
+  balanceable: Balanceable; balancePercent: number
+}
+
+export interface BankRow {
+  id: string; name: string; accountType: string; party: 'A' | 'B'
+  currency: string; balance: number; exchangeRate: number
+  liquidityDate: string; interestRate: number; creditUsed: number
+  balanceable: Balanceable; balancePercent: number
+}
+
 export interface Assets {
   realEstate: RealEstateRow[]
   pension: PensionRow[]
@@ -60,6 +73,8 @@ export interface Assets {
   financial: SimpleRow[]
   vehicles: SimpleRow[]
   debts: SimpleRow[]
+  securities: SecuritiesRow[]
+  bank: BankRow[]
 }
 
 // ─── DB row type (what Supabase returns) ─────────────────────────────────────
@@ -145,6 +160,40 @@ function dbToSimple(r: DbAsset): SimpleRow {
     name: r.name,
     valueA: Number(r.value_a),
     valueB: Number(r.value_b),
+    balanceable: r.is_balanceable ? 'balanceable' : 'excluded',
+    balancePercent: Number(r.equalization_percentage),
+  }
+}
+
+function dbToSecurities(r: DbAsset): SecuritiesRow {
+  const party = (r.party ?? 'A') as 'A' | 'B'
+  return {
+    id: r.id,
+    name: r.name,
+    securityType: (r.metadata?.security_type as string) ?? 'stocks',
+    party,
+    marketValue: Number(r.metadata?.market_value ?? (party === 'A' ? r.value_a : r.value_b)),
+    costBasis: Number(r.metadata?.cost_basis ?? 0),
+    taxRate: Number(r.metadata?.tax_rate ?? 25),
+    expiryDate: (r.metadata?.expiry_date as string) ?? '',
+    balanceable: r.is_balanceable ? 'balanceable' : 'excluded',
+    balancePercent: Number(r.equalization_percentage),
+  }
+}
+
+function dbToBank(r: DbAsset): BankRow {
+  const party = (r.party ?? 'A') as 'A' | 'B'
+  return {
+    id: r.id,
+    name: r.name,
+    accountType: (r.metadata?.account_type as string) ?? 'current',
+    party,
+    currency: (r.metadata?.currency as string) ?? '₪',
+    balance: Number(r.metadata?.original_balance ?? (party === 'A' ? r.value_a : r.value_b)),
+    exchangeRate: Number(r.metadata?.exchange_rate ?? 1),
+    liquidityDate: (r.metadata?.liquidity_date as string) ?? '',
+    interestRate: Number(r.metadata?.interest_rate ?? 0),
+    creditUsed: Number(r.metadata?.credit_used ?? 0),
     balanceable: r.is_balanceable ? 'balanceable' : 'excluded',
     balancePercent: Number(r.equalization_percentage),
   }
@@ -254,6 +303,78 @@ function simpleToDb(r: SimpleRow, caseId: string, category: 'financial' | 'vehic
     is_appraised: false,
     founded_date: null,
     metadata: {},
+  }
+}
+
+function securitiesToDb(r: SecuritiesRow, caseId: string): Omit<DbAsset, 'metadata'> & { metadata: Record<string, unknown> } {
+  const capitalGain = r.marketValue - r.costBasis
+  const expectedTax = capitalGain > 0 ? capitalGain * r.taxRate / 100 : 0
+  const netValue = r.marketValue - expectedTax
+  return {
+    id: r.id,
+    case_id: caseId,
+    category: 'securities',
+    name: r.name,
+    value_a: r.party === 'A' ? netValue : 0,
+    value_b: r.party === 'B' ? netValue : 0,
+    is_balanceable: r.balanceable === 'balanceable',
+    equalization_percentage: r.balancePercent,
+    asset_type: r.securityType,
+    status: null,
+    appraisal_date: null,
+    has_mortgage: false,
+    mortgage_balance: 0,
+    party: r.party,
+    marriage_period_share: null,
+    ownership_percentage: null,
+    is_appraised: false,
+    founded_date: null,
+    metadata: {
+      security_type: r.securityType,
+      market_value: r.marketValue,
+      cost_basis: r.costBasis,
+      tax_rate: r.taxRate,
+      expiry_date: r.expiryDate || null,
+      calculated_capital_gain: capitalGain,
+      calculated_tax: expectedTax,
+      calculated_net_value: netValue,
+    },
+  }
+}
+
+function bankToDb(r: BankRow, caseId: string): Omit<DbAsset, 'metadata'> & { metadata: Record<string, unknown> } {
+  const shekelValue = r.balance * r.exchangeRate
+  const netBalance = shekelValue - r.creditUsed
+  return {
+    id: r.id,
+    case_id: caseId,
+    category: 'bank',
+    name: r.name,
+    value_a: r.party === 'A' ? netBalance : 0,
+    value_b: r.party === 'B' ? netBalance : 0,
+    is_balanceable: r.balanceable === 'balanceable',
+    equalization_percentage: r.balancePercent,
+    asset_type: r.accountType,
+    status: null,
+    appraisal_date: null,
+    has_mortgage: false,
+    mortgage_balance: 0,
+    party: r.party,
+    marriage_period_share: null,
+    ownership_percentage: null,
+    is_appraised: false,
+    founded_date: null,
+    metadata: {
+      account_type: r.accountType,
+      currency: r.currency,
+      original_balance: r.balance,
+      exchange_rate: r.exchangeRate,
+      liquidity_date: r.liquidityDate || null,
+      interest_rate: r.interestRate,
+      credit_used: r.creditUsed,
+      calculated_shekel_value: shekelValue,
+      calculated_net_balance: netBalance,
+    },
   }
 }
 
@@ -376,6 +497,8 @@ export async function loadAssets(caseId: string): Promise<Assets> {
     financial:  rows.filter(r => r.category === 'financial').map(dbToSimple),
     vehicles:   rows.filter(r => r.category === 'vehicle').map(dbToSimple),
     debts:      rows.filter(r => r.category === 'debt').map(dbToSimple),
+    securities: rows.filter(r => r.category === 'securities').map(dbToSecurities),
+    bank:       rows.filter(r => r.category === 'bank').map(dbToBank),
   }
 }
 
@@ -386,6 +509,7 @@ export async function loadAssets(caseId: string): Promise<Assets> {
  * DB rows whose id is no longer in the local list (user removed them).
  */
 export async function saveAssets(caseId: string, assets: Assets): Promise<void> {
+  // categories: real_estate, pension, business, financial, vehicle, debt, securities, bank
   const dbRows = [
     ...assets.realEstate.map(r => reToDb(r, caseId)),
     ...assets.pension.map(r => pensionToDb(r, caseId)),
@@ -393,6 +517,8 @@ export async function saveAssets(caseId: string, assets: Assets): Promise<void> 
     ...assets.financial.map(r => simpleToDb(r, caseId, 'financial')),
     ...assets.vehicles.map(r => simpleToDb(r, caseId, 'vehicle')),
     ...assets.debts.map(r => simpleToDb(r, caseId, 'debt')),
+    ...assets.securities.map(r => securitiesToDb(r, caseId)),
+    ...assets.bank.map(r => bankToDb(r, caseId)),
   ]
 
   // Delete rows that no longer exist in local state

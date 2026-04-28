@@ -6,7 +6,7 @@ import Link from 'next/link'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { loadAssets, saveAssets, deleteAsset } from '@/lib/db'
-import type { Assets, RealEstateRow, PensionRow, BusinessRow, SimpleRow } from '@/lib/db'
+import type { Assets, RealEstateRow, PensionRow, BusinessRow, SimpleRow, SecuritiesRow, BankRow } from '@/lib/db'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,16 @@ const defaultBusiness = (): BusinessRow => ({
 })
 const defaultSimple = (): SimpleRow => ({
   id: crypto.randomUUID(), name: '', valueA: 0, valueB: 0, balanceable: 'balanceable', balancePercent: 50,
+})
+const defaultSecurities = (): SecuritiesRow => ({
+  id: crypto.randomUUID(), name: '', securityType: 'stocks', party: 'A',
+  marketValue: 0, costBasis: 0, taxRate: 25, expiryDate: '',
+  balanceable: 'balanceable', balancePercent: 50,
+})
+const defaultBank = (): BankRow => ({
+  id: crypto.randomUUID(), name: '', accountType: 'current', party: 'A',
+  currency: '₪', balance: 0, exchangeRate: 1, liquidityDate: '',
+  interestRate: 0, creditUsed: 0, balanceable: 'balanceable', balancePercent: 50,
 })
 
 // ─── Primitive UI helpers (module-level — safe to use inside any component) ──
@@ -916,13 +926,236 @@ function SimpleTable({ title, rows, onUpdate, onAdd, onRemove }: SimpleTableProp
   )
 }
 
+// ─── SecuritiesTable ──────────────────────────────────────────────────────────
+
+interface SecuritiesTableProps {
+  rows: SecuritiesRow[]
+  onUpdate: (idx: number, field: keyof SecuritiesRow, val: string | number) => void
+  onAdd: () => void
+  onRemove: (idx: number) => void
+}
+
+function SecuritiesTable({ rows, onUpdate, onAdd, onRemove }: SecuritiesTableProps) {
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>ניירות ערך</h3>
+        <button className="btn-primary" onClick={onAdd} style={{ padding: '0.375rem 0.875rem', fontSize: '0.8125rem' }}>+ הוסף שורה</button>
+      </div>
+      {rows.length === 0 ? (
+        <EmptyState label="ניירות ערך" onAdd={onAdd} />
+      ) : (
+        <div className="table-container" style={{ overflowX: 'auto' }}>
+          <table style={{ minWidth: '1200px' }}>
+            <thead>
+              <tr>
+                <th style={{ minWidth: '140px' }}>שם הנייר</th>
+                <th style={{ minWidth: '110px' }}>סוג נייר</th>
+                <th style={{ minWidth: '70px' }}>צד</th>
+                <th style={{ minWidth: '120px' }}>שווי שוק (₪)</th>
+                <th style={{ minWidth: '120px' }}>עלות רכישה (₪)</th>
+                <th style={{ minWidth: '110px' }}>רווח הון (₪)</th>
+                <th style={{ minWidth: '80px' }}>מס (%)</th>
+                <th style={{ minWidth: '110px' }}>מס רו"ה (₪)</th>
+                <th style={{ minWidth: '120px', fontWeight: 700 }}>שווי נטו (₪)</th>
+                <th style={{ minWidth: '110px' }}>מועד פקיעה</th>
+                <th style={{ minWidth: '90px' }}>בר-איזון</th>
+                <th style={{ minWidth: '70px' }}>% איזון</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const capitalGain = r.marketValue - r.costBasis
+                const expectedTax = capitalGain > 0 ? capitalGain * r.taxRate / 100 : 0
+                const netValue = r.marketValue - expectedTax
+                const fmtVal = (n: number) => n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₪'
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      <input type="text" className="input" value={r.name}
+                        onChange={e => onUpdate(i, 'name', e.target.value)} placeholder="שם הנייר"
+                        style={{ fontWeight: 600 }} />
+                    </td>
+                    <td>
+                      <Sel value={r.securityType} onChange={v => onUpdate(i, 'securityType', v)} options={[
+                        { value: 'stocks', label: 'מניות' },
+                        { value: 'bonds', label: 'אג"ח' },
+                        { value: 'fund', label: 'קרן נאמנות' },
+                        { value: 'option', label: 'אופציה' },
+                        { value: 'other', label: 'אחר' },
+                      ]} />
+                    </td>
+                    <td>
+                      <Sel value={r.party} onChange={v => onUpdate(i, 'party', v)} options={[
+                        { value: 'A', label: 'צד א' },
+                        { value: 'B', label: 'צד ב' },
+                      ]} />
+                    </td>
+                    <td><NumCell value={r.marketValue} onChange={v => onUpdate(i, 'marketValue', v)} /></td>
+                    <td><NumCell value={r.costBasis} onChange={v => onUpdate(i, 'costBasis', v)} /></td>
+                    <td>
+                      <div style={{
+                        fontWeight: 600, fontSize: '13px', padding: '6px 8px', whiteSpace: 'nowrap',
+                        direction: 'ltr', textAlign: 'left',
+                        color: capitalGain >= 0 ? '#16a34a' : '#dc2626',
+                      }}>
+                        {fmtVal(capitalGain)}
+                      </div>
+                    </td>
+                    <td><Inp type="number" value={r.taxRate} onChange={v => onUpdate(i, 'taxRate', Number(v))} dir="ltr" /></td>
+                    <td>
+                      <div style={{ fontSize: '13px', padding: '6px 8px', whiteSpace: 'nowrap', direction: 'ltr', textAlign: 'left', color: '#374151' }}>
+                        {fmtVal(expectedTax)}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 700, fontSize: '14px', padding: '6px 8px', whiteSpace: 'nowrap', direction: 'ltr', textAlign: 'left', color: '#1a1a2e' }}>
+                        {fmtVal(netValue)}
+                      </div>
+                    </td>
+                    <td><Inp type="date" value={r.expiryDate} onChange={v => onUpdate(i, 'expiryDate', v)} dir="ltr" /></td>
+                    <td>
+                      <Sel value={r.balanceable} onChange={v => onUpdate(i, 'balanceable', v)} options={[
+                        { value: 'balanceable', label: 'בר-איזון' },
+                        { value: 'excluded', label: 'מוחרג' },
+                      ]} />
+                    </td>
+                    <td><Inp type="number" value={r.balancePercent} onChange={v => onUpdate(i, 'balancePercent', Number(v))} dir="ltr" /></td>
+                    <td><DeleteBtn onClick={() => onRemove(i)} /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ─── BankTable ────────────────────────────────────────────────────────────────
+
+interface BankTableProps {
+  rows: BankRow[]
+  onUpdate: (idx: number, field: keyof BankRow, val: string | number) => void
+  onAdd: () => void
+  onRemove: (idx: number) => void
+}
+
+function BankTable({ rows, onUpdate, onAdd, onRemove }: BankTableProps) {
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>חשבונות פיננסיים</h3>
+        <button className="btn-primary" onClick={onAdd} style={{ padding: '0.375rem 0.875rem', fontSize: '0.8125rem' }}>+ הוסף שורה</button>
+      </div>
+      {rows.length === 0 ? (
+        <EmptyState label="חשבון פיננסי" onAdd={onAdd} />
+      ) : (
+        <div className="table-container" style={{ overflowX: 'auto' }}>
+          <table style={{ minWidth: '1300px' }}>
+            <thead>
+              <tr>
+                <th style={{ minWidth: '150px' }}>שם החשבון / בנק</th>
+                <th style={{ minWidth: '110px' }}>סוג חשבון</th>
+                <th style={{ minWidth: '70px' }}>צד</th>
+                <th style={{ minWidth: '80px' }}>מטבע</th>
+                <th style={{ minWidth: '120px' }}>יתרה</th>
+                <th style={{ minWidth: '80px' }}>שע"ח</th>
+                <th style={{ minWidth: '120px' }}>שווי שקלי (₪)</th>
+                <th style={{ minWidth: '110px' }}>תאריך נזילות</th>
+                <th style={{ minWidth: '80px' }}>ריבית (%)</th>
+                <th style={{ minWidth: '120px' }}>מסגרת מנוצלת (₪)</th>
+                <th style={{ minWidth: '120px', fontWeight: 700 }}>יתרה נטו (₪)</th>
+                <th style={{ minWidth: '90px' }}>בר-איזון</th>
+                <th style={{ minWidth: '70px' }}>% איזון</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const shekelValue = r.balance * r.exchangeRate
+                const netBalance = shekelValue - r.creditUsed
+                const fmtVal = (n: number) => n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₪'
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      <input type="text" className="input" value={r.name}
+                        onChange={e => onUpdate(i, 'name', e.target.value)} placeholder="שם החשבון"
+                        style={{ fontWeight: 600 }} />
+                    </td>
+                    <td>
+                      <Sel value={r.accountType} onChange={v => onUpdate(i, 'accountType', v)} options={[
+                        { value: 'current', label: 'עו"ש' },
+                        { value: 'deposit', label: 'פק"מ' },
+                        { value: 'structured', label: 'פיקדון מובנה' },
+                        { value: 'forex', label: 'מט"ח' },
+                        { value: 'other', label: 'אחר' },
+                      ]} />
+                    </td>
+                    <td>
+                      <Sel value={r.party} onChange={v => onUpdate(i, 'party', v)} options={[
+                        { value: 'A', label: 'צד א' },
+                        { value: 'B', label: 'צד ב' },
+                      ]} />
+                    </td>
+                    <td>
+                      <Sel value={r.currency} onChange={v => onUpdate(i, 'currency', v)} options={[
+                        { value: '₪', label: '₪ שקל' },
+                        { value: '$', label: '$ דולר' },
+                        { value: '€', label: '€ יורו' },
+                        { value: 'other', label: 'אחר' },
+                      ]} />
+                    </td>
+                    <td><NumCell value={r.balance} onChange={v => onUpdate(i, 'balance', v)} /></td>
+                    <td>
+                      {r.currency !== '₪' ? (
+                        <Inp type="number" value={r.exchangeRate} onChange={v => onUpdate(i, 'exchangeRate', Number(v))} dir="ltr" />
+                      ) : (
+                        <span style={{ padding: '0 8px', color: '#9ca3af', fontSize: '12px' }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '13px', padding: '6px 8px', whiteSpace: 'nowrap', direction: 'ltr', textAlign: 'left', color: '#374151' }}>
+                        {fmtVal(shekelValue)}
+                      </div>
+                    </td>
+                    <td><Inp type="date" value={r.liquidityDate} onChange={v => onUpdate(i, 'liquidityDate', v)} dir="ltr" /></td>
+                    <td><Inp type="number" value={r.interestRate} onChange={v => onUpdate(i, 'interestRate', Number(v))} dir="ltr" /></td>
+                    <td><NumCell value={r.creditUsed} onChange={v => onUpdate(i, 'creditUsed', v)} /></td>
+                    <td>
+                      <div style={{ fontWeight: 700, fontSize: '14px', padding: '6px 8px', whiteSpace: 'nowrap', direction: 'ltr', textAlign: 'left', color: '#1a1a2e' }}>
+                        {fmtVal(netBalance)}
+                      </div>
+                    </td>
+                    <td>
+                      <Sel value={r.balanceable} onChange={v => onUpdate(i, 'balanceable', v)} options={[
+                        { value: 'balanceable', label: 'בר-איזון' },
+                        { value: 'excluded', label: 'מוחרג' },
+                      ]} />
+                    </td>
+                    <td><Inp type="number" value={r.balancePercent} onChange={v => onUpdate(i, 'balancePercent', Number(v))} dir="ltr" /></td>
+                    <td><DeleteBtn onClick={() => onRemove(i)} /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── Tab config ───────────────────────────────────────────────────────────────
 
 const TABS = [
   { key: 'realEstate', label: 'נדל"ן' },
   { key: 'pension',    label: 'פנסיה וגמל' },
   { key: 'business',  label: 'עסק/חברה' },
-  { key: 'financial', label: 'פיננסי' },
+  { key: 'securities', label: 'ניירות ערך' },
+  { key: 'bank',       label: 'חשבון פיננסי' },
   { key: 'vehicles',  label: 'רכב' },
   { key: 'debts',     label: 'חובות' },
 ] as const
@@ -937,6 +1170,7 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
   const [activeTab, setActiveTab] = useState<TabKey>('realEstate')
   const [assets, setAssets] = useState<Assets>({
     realEstate: [], pension: [], business: [], financial: [], vehicles: [], debts: [],
+    securities: [], bank: [],
   })
   const [pageLoading, setPageLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -1029,7 +1263,7 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
     }))
   , [])
 
-  // ─── Simple category handlers (financial / vehicles / debts) ─────────────
+  // ─── Simple category handlers (vehicles / debts) ────────────────────────
 
   const makeSimpleHandlers = useCallback((category: 'financial' | 'vehicles' | 'debts') => ({
     onAdd: () => {
@@ -1051,9 +1285,46 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
     },
   }), [])
 
-  const financialHandlers = makeSimpleHandlers('financial')
-  const vehiclesHandlers  = makeSimpleHandlers('vehicles')
-  const debtsHandlers     = makeSimpleHandlers('debts')
+  const vehiclesHandlers = makeSimpleHandlers('vehicles')
+  const debtsHandlers    = makeSimpleHandlers('debts')
+
+  // ─── Securities handlers ──────────────────────────────────────────────────
+
+  const addSecurities = useCallback(() => {
+    setAssets(prev => ({ ...prev, securities: [...prev.securities, defaultSecurities()] }))
+  }, [])
+  const removeSecurities = useCallback((idx: number) => {
+    setAssets(prev => {
+      const row = prev.securities[idx]
+      if (row) deleteAsset(row.id).catch(() => null)
+      return { ...prev, securities: prev.securities.filter((_, i) => i !== idx) }
+    })
+  }, [])
+  const updateSecurities = useCallback((idx: number, field: keyof SecuritiesRow, val: string | number) =>
+    setAssets(prev => ({
+      ...prev,
+      securities: prev.securities.map((r, i) => i === idx ? { ...r, [field]: val } : r),
+    }))
+  , [])
+
+  // ─── Bank handlers ────────────────────────────────────────────────────────
+
+  const addBank = useCallback(() => {
+    setAssets(prev => ({ ...prev, bank: [...prev.bank, defaultBank()] }))
+  }, [])
+  const removeBank = useCallback((idx: number) => {
+    setAssets(prev => {
+      const row = prev.bank[idx]
+      if (row) deleteAsset(row.id).catch(() => null)
+      return { ...prev, bank: prev.bank.filter((_, i) => i !== idx) }
+    })
+  }, [])
+  const updateBank = useCallback((idx: number, field: keyof BankRow, val: string | number) =>
+    setAssets(prev => ({
+      ...prev,
+      bank: prev.bank.map((r, i) => i === idx ? { ...r, [field]: val } : r),
+    }))
+  , [])
 
   // ─── Save to Supabase and navigate ───────────────────────────────────────
 
@@ -1166,8 +1437,21 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
                 onRemove={removeBusiness}
               />
             )}
-            {activeTab === 'financial' && (
-              <SimpleTable title="נכסים פיננסיים" rows={assets.financial} {...financialHandlers} />
+            {activeTab === 'securities' && (
+              <SecuritiesTable
+                rows={assets.securities}
+                onUpdate={updateSecurities}
+                onAdd={addSecurities}
+                onRemove={removeSecurities}
+              />
+            )}
+            {activeTab === 'bank' && (
+              <BankTable
+                rows={assets.bank}
+                onUpdate={updateBank}
+                onAdd={addBank}
+                onRemove={removeBank}
+              />
             )}
             {activeTab === 'vehicles' && (
               <SimpleTable title="רכבים" rows={assets.vehicles} {...vehiclesHandlers} />
