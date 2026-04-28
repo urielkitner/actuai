@@ -475,8 +475,12 @@ export default function DashboardPage() {
           </div>
           <div style={{ height: '1px', background: '#2d3654', marginBottom: '0' }} />
 
-          {/* User section */}
-          <div style={{ padding: '16px', textAlign: 'center', borderBottom: '1px solid #2d3654' }}>
+          {/* User section — click to open profile */}
+          <div
+            onClick={() => router.push('/profile')}
+            style={{ padding: '16px', textAlign: 'center', borderBottom: '1px solid #2d3654', cursor: 'pointer' }}
+            title="הפרופיל שלי"
+          >
             <div style={{
               width: '40px', height: '40px', borderRadius: '50%', background: '#4f46e5',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -487,8 +491,11 @@ export default function DashboardPage() {
             <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '14px', marginTop: '10px', lineHeight: 1.3 }}>
               {getDisplayName()}
             </div>
+            <div style={{ color: '#6366f1', fontSize: '11px', marginTop: '4px', fontWeight: 400 }}>
+              הפרופיל שלי ›
+            </div>
             {ilaaStatus === 'approved' && (
-              <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>
+              <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
                 אקטואר מוסמך | ILAA
               </div>
             )}
