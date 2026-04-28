@@ -270,64 +270,82 @@ function MaslakaImportModal({ onImport, onClose }: MaslakaImportModalProps) {
       try {
         const data = new Uint8Array(e.target!.result as ArrayBuffer)
         const wb = XLSX.read(data, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
 
-        // Read all rows as arrays (no header interpretation yet)
-        const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' })
+        console.log('[Maslaka] Sheet names:', wb.SheetNames)
 
-        console.log('[Maslaka] Total raw rows:', allRows.length)
-        console.log('[Maslaka] First 5 rows:', JSON.stringify(allRows.slice(0, 5)))
+        // ── 1. Find the best sheet: first one that has a header-like row ──────
+        const HEADER_SIGNALS = ['שם מוצר', 'חיסכון', 'פוליסה', 'סטטוס', 'חברה']
+        let bestSheet: XLSX.WorkSheet | null = null
+        let bestAllRows: unknown[][] = []
+        let bestHeaderIdx = -1
 
-        // Find the header row — first row that contains 'שם מוצר' or 'שם חברה מנהלת'
-        const HEADER_SIGNALS = ['שם מוצר', 'שם חברה מנהלת', 'סוג מוצר', 'סטטוס']
-        let headerRowIdx = -1
-        for (let i = 0; i < Math.min(allRows.length, 20); i++) {
-          const row = allRows[i] as unknown[]
-          const cells = row.map(c => String(c ?? '').trim())
-          const matches = HEADER_SIGNALS.filter(sig => cells.some(c => c.includes(sig)))
-          if (matches.length >= 2) {
-            headerRowIdx = i
-            break
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName]
+          const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][]
+          console.log(`[Maslaka] Sheet "${sheetName}" has ${rows.length} rows`)
+          console.log(`[Maslaka] Sheet "${sheetName}" first 3 rows:`, JSON.stringify(rows.slice(0, 3)))
+
+          for (let i = 0; i < Math.min(rows.length, 30); i++) {
+            const cells = (rows[i] as unknown[]).map(c => String(c ?? '').trim())
+            const hits = HEADER_SIGNALS.filter(sig => cells.some(c => c.includes(sig)))
+            if (hits.length >= 2 && i > bestHeaderIdx) {
+              bestSheet = ws
+              bestAllRows = rows
+              bestHeaderIdx = i
+              console.log(`[Maslaka] Header candidate in sheet "${sheetName}" row ${i}: hits=${hits.join(',')}`)
+              break
+            }
           }
+          if (bestHeaderIdx >= 0) break   // stop at first sheet with a valid header
         }
 
-        if (headerRowIdx === -1) {
-          console.warn('[Maslaka] Could not find header row. Falling back to row 0.')
-          headerRowIdx = 0
+        // Fallback: use first sheet row 0
+        if (!bestSheet) {
+          console.warn('[Maslaka] No header row found across all sheets — falling back to sheet 0 row 0')
+          bestSheet = wb.Sheets[wb.SheetNames[0]]
+          bestAllRows = XLSX.utils.sheet_to_json<unknown[]>(bestSheet, { header: 1, defval: '' }) as unknown[][]
+          bestHeaderIdx = 0
         }
 
-        const headers = (allRows[headerRowIdx] as unknown[]).map(c => String(c ?? '').trim())
-        console.log('[Maslaka] Header row index:', headerRowIdx)
-        console.log('[Maslaka] Headers found:', headers)
+        const headers = bestAllRows[bestHeaderIdx].map(c => String(c ?? '').trim())
+        console.log('[Maslaka] Final header row index:', bestHeaderIdx)
+        console.log('[Maslaka] All headers:', headers)
 
-        const dataRows = allRows.slice(headerRowIdx + 1).filter(
-          r => (r as unknown[]).some(c => String(c ?? '').trim() !== '')
-        )
+        const dataRows = bestAllRows
+          .slice(bestHeaderIdx + 1)
+          .filter(r => (r as unknown[]).some(c => String(c ?? '').trim() !== ''))
 
-        console.log('[Maslaka] Data rows count:', dataRows.length)
+        console.log('[Maslaka] Data row count:', dataRows.length)
+
         if (dataRows.length > 0) {
           const sample: Record<string, unknown> = {}
-          headers.forEach((h, i) => { sample[h] = (dataRows[0] as unknown[])[i] })
-          console.log('[Maslaka] First data row (mapped):', JSON.stringify(sample))
+          headers.forEach((h, i) => { sample[h || `col_${i}`] = (dataRows[0] as unknown[])[i] })
+          console.log('[Maslaka] First data row mapped:', JSON.stringify(sample))
         }
 
         if (dataRows.length === 0) { setParseError('לא נמצאו שורות נתונים בקובץ'); return }
 
-        const colIdx = (name: string) => headers.findIndex(h => h.includes(name))
+        // ── 2. Fuzzy column finder ─────────────────────────────────────────────
+        // Returns the index of the first header that contains ANY of the needles.
+        const findCol = (needles: string[]): number => {
+          const idx = headers.findIndex(h => needles.some(n => h.includes(n)))
+          console.log(`[Maslaka] findCol(${JSON.stringify(needles)}) →`, idx, idx >= 0 ? `"${headers[idx]}"` : 'NOT FOUND')
+          return idx
+        }
 
-        const idxProductName  = colIdx('שם מוצר')
-        const idxCompany      = colIdx('שם חברה מנהלת')
-        const idxProductType  = colIdx('סוג מוצר')
-        const idxStatus       = colIdx('סטטוס')
-        const idxSavings      = colIdx('סך הכל חיסכון')
-        const idxJoinDate     = colIdx('תאריך הצטרפות')
-
-        console.log('[Maslaka] Column indices:', { idxProductName, idxCompany, idxProductType, idxStatus, idxSavings, idxJoinDate })
+        const idxProductName = findCol(['שם מוצר'])
+        const idxCompany     = findCol(['שם חברה מנהלת', 'חברה מנהלת', 'חברה'])
+        const idxProductType = findCol(['סוג מוצר', 'סוג'])
+        const idxStatus      = findCol(['סטטוס'])
+        const idxSavings     = findCol(['סך הכל חיסכון', 'סך הכל', 'חיסכון'])
+        const idxJoinDate    = findCol(['תאריך הצטרפות', 'תאריך פתיחה'])
 
         const getCell = (row: unknown[], idx: number) => idx >= 0 ? String(row[idx] ?? '').trim() : ''
-        const getNum  = (row: unknown[], idx: number) => {
+        const getNum  = (row: unknown[], idx: number): number => {
           if (idx < 0) return 0
-          const raw = String(row[idx] ?? '').replace(/[^0-9.-]/g, '')
+          const v = row[idx]
+          if (typeof v === 'number') return v
+          const raw = String(v ?? '').replace(/[^0-9.-]/g, '')
           return parseFloat(raw) || 0
         }
 
@@ -341,10 +359,15 @@ function MaslakaImportModal({ onImport, onClose }: MaslakaImportModalProps) {
             status:       getCell(r, idxStatus),
             totalSavings: getNum(r, idxSavings),
             joinDate:     getCell(r, idxJoinDate),
-            raw:          Object.fromEntries(headers.map((h, i) => [h, r[i]])),
+            raw:          Object.fromEntries(headers.map((h, i) => [h || `col_${i}`, r[i]])),
             checked:      true,
           }
         })
+
+        console.log('[Maslaka] Parsed rows sample:', JSON.stringify(rows.slice(0, 2).map(r => ({
+          productName: r.productName, company: r.company, productType: r.productType,
+          status: r.status, totalSavings: r.totalSavings,
+        }))))
 
         setPreview(rows)
         setStep('preview')
