@@ -60,7 +60,7 @@ export interface SecuritiesRow {
 }
 
 export interface BankRow {
-  id: string; name: string; accountType: string; party: 'A' | 'B'
+  id: string; name: string; accountNumber: string; accountType: string; party: 'A' | 'B'
   currency: string; balance: number; exchangeRate: number
   liquidityDate: string; interestRate: number; creditUsed: number
   balanceable: Balanceable; balancePercent: number
@@ -187,6 +187,7 @@ function dbToBank(r: DbAsset): BankRow {
     id: r.id,
     name: r.name,
     accountType: (r.metadata?.account_type as string) ?? 'current',
+    accountNumber: (r.metadata?.account_number as string) ?? '',
     party,
     currency: (r.metadata?.currency as string) ?? '₪',
     balance: Number(r.metadata?.original_balance ?? (party === 'A' ? r.value_a : r.value_b)),
@@ -366,6 +367,7 @@ function bankToDb(r: BankRow, caseId: string): Omit<DbAsset, 'metadata'> & { met
     founded_date: null,
     metadata: {
       account_type: r.accountType,
+      account_number: r.accountNumber || null,
       currency: r.currency,
       original_balance: r.balance,
       exchange_rate: r.exchangeRate,

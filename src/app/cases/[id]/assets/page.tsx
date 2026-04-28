@@ -39,7 +39,7 @@ const defaultSecurities = (): SecuritiesRow => ({
   balanceable: 'balanceable', balancePercent: 50,
 })
 const defaultBank = (): BankRow => ({
-  id: crypto.randomUUID(), name: '', accountType: 'current', party: 'A',
+  id: crypto.randomUUID(), name: '', accountNumber: '', accountType: 'current', party: 'A',
   currency: '₪', balance: 0, exchangeRate: 1, liquidityDate: '',
   interestRate: 0, creditUsed: 0, balanceable: 'balanceable', balancePercent: 50,
 })
@@ -1058,6 +1058,7 @@ function BankTable({ rows, onUpdate, onAdd, onRemove }: BankTableProps) {
             <thead>
               <tr>
                 <th style={{ minWidth: '150px' }}>שם החשבון / בנק</th>
+                <th style={{ minWidth: '110px' }}>מספר חשבון</th>
                 <th style={{ minWidth: '110px' }}>סוג חשבון</th>
                 <th style={{ minWidth: '70px' }}>צד</th>
                 <th style={{ minWidth: '80px' }}>מטבע</th>
@@ -1084,6 +1085,11 @@ function BankTable({ rows, onUpdate, onAdd, onRemove }: BankTableProps) {
                       <input type="text" className="input" value={r.name}
                         onChange={e => onUpdate(i, 'name', e.target.value)} placeholder="שם החשבון"
                         style={{ fontWeight: 600 }} />
+                    </td>
+                    <td>
+                      <input type="text" className="input" value={r.accountNumber}
+                        onChange={e => onUpdate(i, 'accountNumber', e.target.value)}
+                        placeholder="000000" dir="ltr" style={{ textAlign: 'left' }} />
                     </td>
                     <td>
                       <Sel value={r.accountType} onChange={v => onUpdate(i, 'accountType', v)} options={[
