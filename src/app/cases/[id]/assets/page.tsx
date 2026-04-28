@@ -269,27 +269,87 @@ function MaslakaImportModal({ onImport, onClose }: MaslakaImportModalProps) {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target!.result as ArrayBuffer)
-        const wb = XLSX.read(data, { type: 'array', codepage: 65001 })
+        const wb = XLSX.read(data, { type: 'array' })
         const ws = wb.Sheets[wb.SheetNames[0]]
-        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
 
-        if (json.length === 0) { setParseError('הקובץ ריק או שאין נתונים בגיליון הראשון'); return }
+        // Read all rows as arrays (no header interpretation yet)
+        const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' })
 
-        const rows: MaslakaPreviewRow[] = json.map((row) => ({
-          id: crypto.randomUUID(),
-          productName: String(row[COL_PRODUCT_NAME] ?? ''),
-          company:     String(row[COL_COMPANY] ?? ''),
-          productType: String(row[COL_PRODUCT_TYPE] ?? ''),
-          status:      String(row[COL_STATUS] ?? ''),
-          totalSavings: Number(String(row[COL_TOTAL_SAVINGS] ?? '0').replace(/[^0-9.-]/g, '')) || 0,
-          joinDate:    String(row[COL_JOIN_DATE] ?? ''),
-          raw:         row,
-          checked:     true,
-        }))
+        console.log('[Maslaka] Total raw rows:', allRows.length)
+        console.log('[Maslaka] First 5 rows:', JSON.stringify(allRows.slice(0, 5)))
+
+        // Find the header row — first row that contains 'שם מוצר' or 'שם חברה מנהלת'
+        const HEADER_SIGNALS = ['שם מוצר', 'שם חברה מנהלת', 'סוג מוצר', 'סטטוס']
+        let headerRowIdx = -1
+        for (let i = 0; i < Math.min(allRows.length, 20); i++) {
+          const row = allRows[i] as unknown[]
+          const cells = row.map(c => String(c ?? '').trim())
+          const matches = HEADER_SIGNALS.filter(sig => cells.some(c => c.includes(sig)))
+          if (matches.length >= 2) {
+            headerRowIdx = i
+            break
+          }
+        }
+
+        if (headerRowIdx === -1) {
+          console.warn('[Maslaka] Could not find header row. Falling back to row 0.')
+          headerRowIdx = 0
+        }
+
+        const headers = (allRows[headerRowIdx] as unknown[]).map(c => String(c ?? '').trim())
+        console.log('[Maslaka] Header row index:', headerRowIdx)
+        console.log('[Maslaka] Headers found:', headers)
+
+        const dataRows = allRows.slice(headerRowIdx + 1).filter(
+          r => (r as unknown[]).some(c => String(c ?? '').trim() !== '')
+        )
+
+        console.log('[Maslaka] Data rows count:', dataRows.length)
+        if (dataRows.length > 0) {
+          const sample: Record<string, unknown> = {}
+          headers.forEach((h, i) => { sample[h] = (dataRows[0] as unknown[])[i] })
+          console.log('[Maslaka] First data row (mapped):', JSON.stringify(sample))
+        }
+
+        if (dataRows.length === 0) { setParseError('לא נמצאו שורות נתונים בקובץ'); return }
+
+        const colIdx = (name: string) => headers.findIndex(h => h.includes(name))
+
+        const idxProductName  = colIdx('שם מוצר')
+        const idxCompany      = colIdx('שם חברה מנהלת')
+        const idxProductType  = colIdx('סוג מוצר')
+        const idxStatus       = colIdx('סטטוס')
+        const idxSavings      = colIdx('סך הכל חיסכון')
+        const idxJoinDate     = colIdx('תאריך הצטרפות')
+
+        console.log('[Maslaka] Column indices:', { idxProductName, idxCompany, idxProductType, idxStatus, idxSavings, idxJoinDate })
+
+        const getCell = (row: unknown[], idx: number) => idx >= 0 ? String(row[idx] ?? '').trim() : ''
+        const getNum  = (row: unknown[], idx: number) => {
+          if (idx < 0) return 0
+          const raw = String(row[idx] ?? '').replace(/[^0-9.-]/g, '')
+          return parseFloat(raw) || 0
+        }
+
+        const rows: MaslakaPreviewRow[] = dataRows.map((row) => {
+          const r = row as unknown[]
+          return {
+            id: crypto.randomUUID(),
+            productName:  getCell(r, idxProductName),
+            company:      getCell(r, idxCompany),
+            productType:  getCell(r, idxProductType),
+            status:       getCell(r, idxStatus),
+            totalSavings: getNum(r, idxSavings),
+            joinDate:     getCell(r, idxJoinDate),
+            raw:          Object.fromEntries(headers.map((h, i) => [h, r[i]])),
+            checked:      true,
+          }
+        })
 
         setPreview(rows)
         setStep('preview')
-      } catch {
+      } catch (err) {
+        console.error('[Maslaka] Parse error:', err)
         setParseError('שגיאה בקריאת הקובץ. וודא שהקובץ תקין ובפורמט .xls / .xlsx')
       }
     }
