@@ -97,6 +97,7 @@ function DeleteBtn({ onClick }: { onClick: () => void }) {
 
 function NumCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [editing, setEditing] = useState(false)
+  const formatted = value.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₪'
   if (editing) {
     return (
       <input
@@ -107,7 +108,7 @@ function NumCell({ value, onChange }: { value: number; onChange: (v: number) => 
         onBlur={() => setEditing(false)}
         autoFocus
         dir="ltr"
-        style={{ fontWeight: 700 }}
+        style={{ fontWeight: 700, minWidth: '120px' }}
       />
     )
   }
@@ -117,10 +118,10 @@ function NumCell({ value, onChange }: { value: number; onChange: (v: number) => 
       style={{
         fontWeight: 700, fontSize: '14px', cursor: 'text',
         padding: '6px 8px', borderRadius: '4px', direction: 'ltr',
-        textAlign: 'left', minWidth: '90px',
+        textAlign: 'left', whiteSpace: 'nowrap', minWidth: '120px',
       }}
     >
-      {value ? value.toLocaleString('he-IL') + ' ₪' : '0 ₪'}
+      {formatted}
     </div>
   )
 }
@@ -669,29 +670,39 @@ function PensionTable({ rows, onUpdate, onAdd, onRemove, onImport }: PensionTabl
       {rows.length === 0 ? (
         <EmptyState label="פנסיה" onAdd={onAdd} />
       ) : (
-        <div className="table-container">
-          <table>
+        <div className="table-container" style={{ overflowX: 'auto' }}>
+          <table style={{ minWidth: '1000px' }}>
             <thead>
               <tr>
-                <th>שם קרן</th><th>שם חברה מנהלת</th><th>מספר פוליסה</th>
-                <th>סוג מוצר</th><th>סטטוס</th><th>יתרה (₪)</th>
-                <th>צד</th><th>% נישואין</th><th>בר-איזון</th><th>% איזון</th><th></th>
+                <th style={{ minWidth: '160px' }}>שם קרן</th>
+                <th style={{ minWidth: '180px' }}>שם חברה מנהלת</th>
+                <th style={{ minWidth: '110px' }}>מספר פוליסה</th>
+                <th style={{ minWidth: '100px' }}>סוג מוצר</th>
+                <th style={{ minWidth: '90px' }}>סטטוס</th>
+                <th style={{ minWidth: '130px' }}>יתרה (₪)</th>
+                <th style={{ minWidth: '70px' }}>צד</th>
+                <th style={{ minWidth: '80px' }}>% נישואין</th>
+                <th style={{ minWidth: '90px' }}>בר-איזון</th>
+                <th style={{ minWidth: '70px' }}>% איזון</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r.id}>
-                  <td>
+                  <td style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
                     <input
                       type="text"
                       className="input"
                       value={r.fundName}
                       onChange={e => onUpdate(i, 'fundName', e.target.value)}
                       placeholder="שם הקרן"
-                      style={{ fontWeight: 700, fontSize: '14px' }}
+                      style={{ fontWeight: 700, fontSize: '14px', minWidth: '150px' }}
                     />
                   </td>
-                  <td><Inp value={r.company} onChange={v => onUpdate(i, 'company', v)} placeholder="שם החברה" /></td>
+                  <td style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                    <Inp value={r.company} onChange={v => onUpdate(i, 'company', v)} placeholder="שם החברה" />
+                  </td>
                   <td>
                     <input
                       type="text"
@@ -700,7 +711,7 @@ function PensionTable({ rows, onUpdate, onAdd, onRemove, onImport }: PensionTabl
                       onChange={e => onUpdate(i, 'policyNumber', e.target.value)}
                       placeholder="מספר פוליסה"
                       dir="ltr"
-                      style={{ textAlign: 'left' }}
+                      style={{ textAlign: 'left', minWidth: '100px' }}
                     />
                   </td>
                   <td>
