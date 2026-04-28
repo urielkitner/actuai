@@ -38,6 +38,7 @@ export interface PensionRow {
   id: string; fundName: string; productType: string; startDate: string
   balance: number; marriagePeriodShare: number; party: 'A' | 'B'
   balanceable: Balanceable; balancePercent: number
+  company: string; policyNumber: string; status: string
 }
 
 export interface BusinessRow {
@@ -114,6 +115,9 @@ function dbToPension(r: DbAsset): PensionRow {
     party,
     balanceable: r.is_balanceable ? 'balanceable' : 'excluded',
     balancePercent: Number(r.equalization_percentage),
+    company: (r.metadata?.company as string) ?? '',
+    policyNumber: (r.metadata?.policy_number as string) ?? '',
+    status: (r.metadata?.policy_status as string) ?? '',
   }
 }
 
@@ -192,7 +196,12 @@ function pensionToDb(r: PensionRow, caseId: string): Omit<DbAsset, 'metadata'> &
     ownership_percentage: null,
     is_appraised: false,
     founded_date: null,
-    metadata: { start_date: r.startDate || null },
+    metadata: {
+      start_date: r.startDate || null,
+      company: r.company || null,
+      policy_number: r.policyNumber || null,
+      policy_status: r.status || null,
+    },
   }
 }
 

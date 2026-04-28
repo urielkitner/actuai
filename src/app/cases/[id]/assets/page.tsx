@@ -23,6 +23,7 @@ const defaultRE = (): RealEstateRow => ({
 const defaultPension = (): PensionRow => ({
   id: crypto.randomUUID(), fundName: '', productType: 'pension', startDate: '',
   balance: 0, marriagePeriodShare: 100, party: 'A', balanceable: 'balanceable', balancePercent: 50,
+  company: '', policyNumber: '', status: '',
 })
 const defaultBusiness = (): BusinessRow => ({
   id: crypto.randomUUID(), companyName: '', ownershipPercent: 100, value: 0,
@@ -91,6 +92,36 @@ function DeleteBtn({ onClick }: { onClick: () => void }) {
     >
       ✕
     </button>
+  )
+}
+
+function NumCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  if (editing) {
+    return (
+      <input
+        type="number"
+        className="input"
+        value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        onBlur={() => setEditing(false)}
+        autoFocus
+        dir="ltr"
+        style={{ fontWeight: 700 }}
+      />
+    )
+  }
+  return (
+    <div
+      onClick={() => setEditing(true)}
+      style={{
+        fontWeight: 700, fontSize: '14px', cursor: 'text',
+        padding: '6px 8px', borderRadius: '4px', direction: 'ltr',
+        textAlign: 'left', minWidth: '90px',
+      }}
+    >
+      {value ? value.toLocaleString('he-IL') + ' ₪' : '0 ₪'}
+    </div>
   )
 }
 
@@ -242,6 +273,7 @@ interface MaslakaPreviewRow {
   id: string
   productName: string
   company: string
+  policyNumber: string
   productType: string
   status: string
   totalSavings: number
@@ -343,12 +375,13 @@ function MaslakaImportModal({ onImport, onClose }: MaslakaImportModalProps) {
           return idx
         }
 
-        const idxProductName = findCol([COL_PRODUCT_NAME])
-        const idxCompany     = findCol([COL_COMPANY, 'חברה מנהלת', 'חברה'])
-        const idxProductType = findCol([COL_PRODUCT_TYPE])
-        const idxStatus      = findCol([COL_STATUS])
-        const idxSavings     = findCol([COL_TOTAL_SAVINGS, 'סך הכל', 'חיסכון'])
-        const idxJoinDate    = findCol([COL_JOIN_DATE, 'תאריך הצטרפות', 'תאריך פתיחה'])
+        const idxProductName  = findCol([COL_PRODUCT_NAME])
+        const idxCompany      = findCol([COL_COMPANY, 'חברה מנהלת', 'חברה'])
+        const idxPolicyNumber = findCol(['מספר פוליסה', 'פוליסה', 'מס\' פוליסה'])
+        const idxProductType  = findCol([COL_PRODUCT_TYPE])
+        const idxStatus       = findCol([COL_STATUS])
+        const idxSavings      = findCol([COL_TOTAL_SAVINGS, 'סך הכל', 'חיסכון'])
+        const idxJoinDate     = findCol([COL_JOIN_DATE, 'תאריך הצטרפות', 'תאריך פתיחה'])
 
         const getCell = (row: unknown[], idx: number) => idx >= 0 ? String(row[idx] ?? '').trim() : ''
         const getNum  = (row: unknown[], idx: number): number => {
@@ -367,13 +400,14 @@ function MaslakaImportModal({ onImport, onClose }: MaslakaImportModalProps) {
           return {
             id: crypto.randomUUID(),
             productName,
-            company:      getCell(r, idxCompany),
+            company:       getCell(r, idxCompany),
+            policyNumber:  getCell(r, idxPolicyNumber),
             productType,
-            status:       getCell(r, idxStatus),
-            totalSavings: getNum(r, idxSavings),
-            joinDate:     getCell(r, idxJoinDate),
-            raw:          Object.fromEntries(headers.map((h, i) => [h || `col_${i}`, r[i]])),
-            checked:      true,
+            status:        getCell(r, idxStatus),
+            totalSavings:  getNum(r, idxSavings),
+            joinDate:      getCell(r, idxJoinDate),
+            raw:           Object.fromEntries(headers.map((h, i) => [h || `col_${i}`, r[i]])),
+            checked:       true,
           }
         })
 
@@ -401,7 +435,7 @@ function MaslakaImportModal({ onImport, onClose }: MaslakaImportModalProps) {
     const selected = preview.filter(r => r.checked)
     const pensionRows: PensionRow[] = selected.map(r => ({
       id: crypto.randomUUID(),
-      fundName: r.productName ? `${r.productName} - ${r.company}` : r.company,
+      fundName: r.productName || r.company,
       productType: parseProductType(r.productType),
       startDate: r.joinDate || '',
       balance: r.totalSavings,
@@ -409,6 +443,9 @@ function MaslakaImportModal({ onImport, onClose }: MaslakaImportModalProps) {
       party,
       balanceable: 'balanceable',
       balancePercent: 50,
+      company: r.company,
+      policyNumber: r.policyNumber,
+      status: r.status,
     }))
     onImport(pensionRows)
     setSuccessMsg(`יובאו ${pensionRows.length} נכסים בהצלחה`)
@@ -636,15 +673,36 @@ function PensionTable({ rows, onUpdate, onAdd, onRemove, onImport }: PensionTabl
           <table>
             <thead>
               <tr>
-                <th>שם קרן</th><th>סוג מוצר</th><th>תאריך תחילה</th>
-                <th>יתרה (₪)</th><th>% נישואין</th><th>צד</th>
-                <th>בר-איזון</th><th>% איזון</th><th></th>
+                <th>שם קרן</th><th>שם חברה מנהלת</th><th>מספר פוליסה</th>
+                <th>סוג מוצר</th><th>סטטוס</th><th>יתרה (₪)</th>
+                <th>צד</th><th>% נישואין</th><th>בר-איזון</th><th>% איזון</th><th></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r.id}>
-                  <td><Inp value={r.fundName} onChange={v => onUpdate(i, 'fundName', v)} placeholder="שם הקרן" /></td>
+                  <td>
+                    <input
+                      type="text"
+                      className="input"
+                      value={r.fundName}
+                      onChange={e => onUpdate(i, 'fundName', e.target.value)}
+                      placeholder="שם הקרן"
+                      style={{ fontWeight: 700, fontSize: '14px' }}
+                    />
+                  </td>
+                  <td><Inp value={r.company} onChange={v => onUpdate(i, 'company', v)} placeholder="שם החברה" /></td>
+                  <td>
+                    <input
+                      type="text"
+                      className="input"
+                      value={r.policyNumber}
+                      onChange={e => onUpdate(i, 'policyNumber', e.target.value)}
+                      placeholder="מספר פוליסה"
+                      dir="ltr"
+                      style={{ textAlign: 'left' }}
+                    />
+                  </td>
                   <td>
                     <Sel value={r.productType} onChange={v => onUpdate(i, 'productType', v)} options={[
                       { value: 'pension', label: 'פנסיה' },
@@ -654,15 +712,33 @@ function PensionTable({ rows, onUpdate, onAdd, onRemove, onImport }: PensionTabl
                       { value: 'governmental', label: 'ממשלתית' },
                     ]} />
                   </td>
-                  <td><Inp type="date" value={r.startDate} onChange={v => onUpdate(i, 'startDate', v)} dir="ltr" /></td>
-                  <td><Inp type="number" value={r.balance} onChange={v => onUpdate(i, 'balance', Number(v))} dir="ltr" /></td>
-                  <td><Inp type="number" value={r.marriagePeriodShare} onChange={v => onUpdate(i, 'marriagePeriodShare', Number(v))} dir="ltr" /></td>
+                  <td>
+                    <select
+                      className="input"
+                      value={r.status}
+                      onChange={e => onUpdate(i, 'status', e.target.value)}
+                      style={{
+                        padding: '3px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 600,
+                        background: r.status === 'פעיל' ? '#dcfce7' : r.status === 'לא פעיל' ? '#f3f4f6' : 'white',
+                        color: r.status === 'פעיל' ? '#16a34a' : r.status === 'לא פעיל' ? '#6b7280' : '#374151',
+                        border: r.status === 'פעיל' ? '1px solid #bbf7d0' : '1px solid #e5e7eb',
+                      }}
+                    >
+                      <option value="">—</option>
+                      <option value="פעיל">פעיל</option>
+                      <option value="לא פעיל">לא פעיל</option>
+                    </select>
+                  </td>
+                  <td>
+                    <NumCell value={r.balance} onChange={v => onUpdate(i, 'balance', v)} />
+                  </td>
                   <td>
                     <Sel value={r.party} onChange={v => onUpdate(i, 'party', v)} options={[
                       { value: 'A', label: 'צד א' },
                       { value: 'B', label: 'צד ב' },
                     ]} />
                   </td>
+                  <td><Inp type="number" value={r.marriagePeriodShare} onChange={v => onUpdate(i, 'marriagePeriodShare', Number(v))} dir="ltr" /></td>
                   <td>
                     <Sel value={r.balanceable} onChange={v => onUpdate(i, 'balanceable', v)} options={[
                       { value: 'balanceable', label: 'בר-איזון' },
