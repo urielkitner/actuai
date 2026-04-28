@@ -6,7 +6,7 @@ import Link from 'next/link'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { loadAssets, saveAssets, deleteAsset } from '@/lib/db'
-import type { Assets, RealEstateRow, PensionRow, BusinessRow, SimpleRow, SecuritiesRow, BankRow } from '@/lib/db'
+import type { Assets, RealEstateRow, PensionRow, BusinessRow, SimpleRow, VehicleRow, SecuritiesRow, BankRow } from '@/lib/db'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,11 @@ const defaultBusiness = (): BusinessRow => ({
 })
 const defaultSimple = (): SimpleRow => ({
   id: crypto.randomUUID(), name: '', valueA: 0, valueB: 0, balanceable: 'balanceable', balancePercent: 50,
+})
+const defaultVehicle = (): VehicleRow => ({
+  id: crypto.randomUUID(), name: '', vehicleType: 'private', year: 0,
+  licensePlate: '', listPrice: 0, marketValue: 0,
+  party: 'A', balanceable: 'balanceable', balancePercent: 50,
 })
 const defaultSecurities = (): SecuritiesRow => ({
   id: crypto.randomUUID(), name: '', securityType: 'stocks', party: 'A',
@@ -926,6 +931,96 @@ function SimpleTable({ title, rows, onUpdate, onAdd, onRemove }: SimpleTableProp
   )
 }
 
+// ─── VehicleTable ─────────────────────────────────────────────────────────────
+
+interface VehicleTableProps {
+  rows: VehicleRow[]
+  onUpdate: (idx: number, field: keyof VehicleRow, val: string | number) => void
+  onAdd: () => void
+  onRemove: (idx: number) => void
+}
+
+function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>רכבים</h3>
+        <button className="btn-primary" onClick={onAdd} style={{ padding: '0.375rem 0.875rem', fontSize: '0.8125rem' }}>+ הוסף שורה</button>
+      </div>
+      {rows.length === 0 ? (
+        <EmptyState label="רכב" onAdd={onAdd} />
+      ) : (
+        <div className="table-container" style={{ overflowX: 'auto' }}>
+          <table style={{ minWidth: '1000px' }}>
+            <thead>
+              <tr>
+                <th style={{ minWidth: '150px' }}>שם / תיאור</th>
+                <th style={{ minWidth: '110px' }}>סוג רכב</th>
+                <th style={{ minWidth: '80px' }}>שנת ייצור</th>
+                <th style={{ minWidth: '110px' }}>מספר רכב</th>
+                <th style={{ minWidth: '120px' }}>מחיר מחירון (₪)</th>
+                <th style={{ minWidth: '120px' }}>שווי רכב (₪)</th>
+                <th style={{ minWidth: '70px' }}>צד</th>
+                <th style={{ minWidth: '90px' }}>בר-איזון</th>
+                <th style={{ minWidth: '70px' }}>% איזון</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.id}>
+                  <td>
+                    <input type="text" className="input" value={r.name}
+                      onChange={e => onUpdate(i, 'name', e.target.value)}
+                      placeholder='טויוטה קורולה' style={{ fontWeight: 600 }} />
+                  </td>
+                  <td>
+                    <Sel value={r.vehicleType} onChange={v => onUpdate(i, 'vehicleType', v)} options={[
+                      { value: 'private',    label: 'פרטי' },
+                      { value: 'commercial', label: 'מסחרי' },
+                      { value: 'motorcycle', label: 'אופנוע' },
+                      { value: 'work',       label: 'רכב עבודה' },
+                      { value: 'other',      label: 'אחר' },
+                    ]} />
+                  </td>
+                  <td>
+                    <input type="number" className="input" value={r.year || ''}
+                      onChange={e => onUpdate(i, 'year', Number(e.target.value))}
+                      placeholder="2019" dir="ltr"
+                      style={{ textAlign: 'left', maxWidth: '80px' }} />
+                  </td>
+                  <td>
+                    <input type="text" className="input" value={r.licensePlate}
+                      onChange={e => onUpdate(i, 'licensePlate', e.target.value)}
+                      placeholder="12-345-67" dir="ltr"
+                      style={{ textAlign: 'left' }} />
+                  </td>
+                  <td><NumCell value={r.listPrice} onChange={v => onUpdate(i, 'listPrice', v)} /></td>
+                  <td><NumCell value={r.marketValue} onChange={v => onUpdate(i, 'marketValue', v)} /></td>
+                  <td>
+                    <Sel value={r.party} onChange={v => onUpdate(i, 'party', v)} options={[
+                      { value: 'A', label: 'צד א' },
+                      { value: 'B', label: 'צד ב' },
+                    ]} />
+                  </td>
+                  <td>
+                    <Sel value={r.balanceable} onChange={v => onUpdate(i, 'balanceable', v)} options={[
+                      { value: 'balanceable', label: 'בר-איזון' },
+                      { value: 'excluded',    label: 'מוחרג' },
+                    ]} />
+                  </td>
+                  <td><Inp type="number" value={r.balancePercent} onChange={v => onUpdate(i, 'balancePercent', Number(v))} dir="ltr" /></td>
+                  <td><DeleteBtn onClick={() => onRemove(i)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── SecuritiesTable ──────────────────────────────────────────────────────────
 
 interface SecuritiesTableProps {
@@ -1269,9 +1364,28 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
     }))
   , [])
 
-  // ─── Simple category handlers (vehicles / debts) ────────────────────────
+  // ─── Vehicle handlers ────────────────────────────────────────────────────
 
-  const makeSimpleHandlers = useCallback((category: 'financial' | 'vehicles' | 'debts') => ({
+  const addVehicle = useCallback(() => {
+    setAssets(prev => ({ ...prev, vehicles: [...prev.vehicles, defaultVehicle()] }))
+  }, [])
+  const removeVehicle = useCallback((idx: number) => {
+    setAssets(prev => {
+      const row = prev.vehicles[idx]
+      if (row) deleteAsset(row.id).catch(() => null)
+      return { ...prev, vehicles: prev.vehicles.filter((_, i) => i !== idx) }
+    })
+  }, [])
+  const updateVehicle = useCallback((idx: number, field: keyof VehicleRow, val: string | number) =>
+    setAssets(prev => ({
+      ...prev,
+      vehicles: prev.vehicles.map((r, i) => i === idx ? { ...r, [field]: val } : r),
+    }))
+  , [])
+
+  // ─── Simple category handlers (debts) ────────────────────────────────────
+
+  const makeSimpleHandlers = useCallback((category: 'financial' | 'debts') => ({
     onAdd: () => {
       const row = defaultSimple()
       setAssets(prev => ({ ...prev, [category]: [...prev[category], row] }))
@@ -1291,8 +1405,7 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
     },
   }), [])
 
-  const vehiclesHandlers = makeSimpleHandlers('vehicles')
-  const debtsHandlers    = makeSimpleHandlers('debts')
+  const debtsHandlers = makeSimpleHandlers('debts')
 
   // ─── Securities handlers ──────────────────────────────────────────────────
 
@@ -1460,7 +1573,12 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
               />
             )}
             {activeTab === 'vehicles' && (
-              <SimpleTable title="רכבים" rows={assets.vehicles} {...vehiclesHandlers} />
+              <VehicleTable
+                rows={assets.vehicles}
+                onUpdate={updateVehicle}
+                onAdd={addVehicle}
+                onRemove={removeVehicle}
+              />
             )}
             {activeTab === 'debts' && (
               <SimpleTable title="חובות" rows={assets.debts} {...debtsHandlers} />

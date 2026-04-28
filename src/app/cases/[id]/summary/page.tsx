@@ -136,8 +136,11 @@ export default function SummaryPage({ params }: { params: Promise<{ id: string }
   const calcSimpleA = (cat: SimpleRow[]) => cat.filter(r => r.balanceable === 'balanceable').reduce((s, r) => s + r.valueA * (r.balancePercent / 100), 0)
   const calcSimpleB = (cat: SimpleRow[]) => cat.filter(r => r.balanceable === 'balanceable').reduce((s, r) => s + r.valueB * (r.balancePercent / 100), 0)
 
-  const totalA = calcREA() + calcPensionA() + calcBizA() + calcSimpleA(assets.financial) + calcSimpleA(assets.vehicles) - calcSimpleA(assets.debts)
-  const totalB = calcREB() + calcPensionB() + calcBizB() + calcSimpleB(assets.financial) + calcSimpleB(assets.vehicles) - calcSimpleB(assets.debts)
+  const calcVehicleA = () => assets.vehicles.filter(v => v.party === 'A' && v.balanceable === 'balanceable').reduce((s, v) => s + v.marketValue * (v.balancePercent / 100), 0)
+  const calcVehicleB = () => assets.vehicles.filter(v => v.party === 'B' && v.balanceable === 'balanceable').reduce((s, v) => s + v.marketValue * (v.balancePercent / 100), 0)
+
+  const totalA = calcREA() + calcPensionA() + calcBizA() + calcSimpleA(assets.financial) + calcVehicleA() - calcSimpleA(assets.debts)
+  const totalB = calcREB() + calcPensionB() + calcBizB() + calcSimpleB(assets.financial) + calcVehicleB() - calcSimpleB(assets.debts)
 
   const gap = Math.abs(totalA - totalB)
   const balancePayment = gap / 2
@@ -151,7 +154,7 @@ export default function SummaryPage({ params }: { params: Promise<{ id: string }
     { label: 'פנסיה וגמל', valueA: calcPensionA(),                      valueB: calcPensionB() },
     { label: 'עסק/חברה',   valueA: calcBizA(),                          valueB: calcBizB() },
     { label: 'פיננסי',     valueA: calcSimpleA(assets.financial),       valueB: calcSimpleB(assets.financial) },
-    { label: 'רכב',        valueA: calcSimpleA(assets.vehicles),        valueB: calcSimpleB(assets.vehicles) },
+    { label: 'רכב',        valueA: calcVehicleA(),                      valueB: calcVehicleB() },
   ].filter(c => c.valueA + c.valueB > 0)
 
   const pieSlices = [
@@ -163,8 +166,8 @@ export default function SummaryPage({ params }: { params: Promise<{ id: string }
     { label: 'צד ב — עסק',     value: calcBizB(),                    color: '#67e8f9' },
     { label: 'צד א — פיננסי',  value: calcSimpleA(assets.financial), color: '#10b981' },
     { label: 'צד ב — פיננסי',  value: calcSimpleB(assets.financial), color: '#6ee7b7' },
-    { label: 'צד א — רכב',     value: calcSimpleA(assets.vehicles),  color: '#f59e0b' },
-    { label: 'צד ב — רכב',     value: calcSimpleB(assets.vehicles),  color: '#fcd34d' },
+    { label: 'צד א — רכב',     value: calcVehicleA(),                color: '#f59e0b' },
+    { label: 'צד ב — רכב',     value: calcVehicleB(),                color: '#fcd34d' },
   ].filter(s => s.value > 0)
 
   return (

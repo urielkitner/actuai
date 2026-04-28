@@ -53,6 +53,12 @@ export interface SimpleRow {
   balanceable: Balanceable; balancePercent: number
 }
 
+export interface VehicleRow {
+  id: string; name: string; vehicleType: string; year: number
+  licensePlate: string; listPrice: number; marketValue: number
+  party: 'A' | 'B'; balanceable: Balanceable; balancePercent: number
+}
+
 export interface SecuritiesRow {
   id: string; name: string; securityType: string; party: 'A' | 'B'
   marketValue: number; costBasis: number; taxRate: number; expiryDate: string
@@ -71,7 +77,7 @@ export interface Assets {
   pension: PensionRow[]
   business: BusinessRow[]
   financial: SimpleRow[]
-  vehicles: SimpleRow[]
+  vehicles: VehicleRow[]
   debts: SimpleRow[]
   securities: SecuritiesRow[]
   bank: BankRow[]
@@ -162,6 +168,51 @@ function dbToSimple(r: DbAsset): SimpleRow {
     valueB: Number(r.value_b),
     balanceable: r.is_balanceable ? 'balanceable' : 'excluded',
     balancePercent: Number(r.equalization_percentage),
+  }
+}
+
+function dbToVehicle(r: DbAsset): VehicleRow {
+  const party = (r.party ?? 'A') as 'A' | 'B'
+  return {
+    id: r.id,
+    name: r.name,
+    vehicleType: (r.metadata?.vehicle_type as string) ?? 'private',
+    year: Number(r.metadata?.year ?? 0),
+    licensePlate: (r.metadata?.license_plate as string) ?? '',
+    listPrice: Number(r.metadata?.list_price ?? 0),
+    marketValue: party === 'A' ? Number(r.value_a) : Number(r.value_b),
+    party,
+    balanceable: r.is_balanceable ? 'balanceable' : 'excluded',
+    balancePercent: Number(r.equalization_percentage),
+  }
+}
+
+function vehicleToDb(r: VehicleRow, caseId: string): Omit<DbAsset, 'metadata'> & { metadata: Record<string, unknown> } {
+  return {
+    id: r.id,
+    case_id: caseId,
+    category: 'vehicle',
+    name: r.name,
+    value_a: r.party === 'A' ? r.marketValue : 0,
+    value_b: r.party === 'B' ? r.marketValue : 0,
+    is_balanceable: r.balanceable === 'balanceable',
+    equalization_percentage: r.balancePercent,
+    asset_type: r.vehicleType,
+    status: null,
+    appraisal_date: null,
+    has_mortgage: false,
+    mortgage_balance: 0,
+    party: r.party,
+    marriage_period_share: null,
+    ownership_percentage: null,
+    is_appraised: false,
+    founded_date: null,
+    metadata: {
+      vehicle_type: r.vehicleType,
+      year: r.year,
+      license_plate: r.licensePlate || null,
+      list_price: r.listPrice,
+    },
   }
 }
 
@@ -497,7 +548,7 @@ export async function loadAssets(caseId: string): Promise<Assets> {
     pension:    rows.filter(r => r.category === 'pension').map(dbToPension),
     business:   rows.filter(r => r.category === 'business').map(dbToBusiness),
     financial:  rows.filter(r => r.category === 'financial').map(dbToSimple),
-    vehicles:   rows.filter(r => r.category === 'vehicle').map(dbToSimple),
+    vehicles:   rows.filter(r => r.category === 'vehicle').map(dbToVehicle),
     debts:      rows.filter(r => r.category === 'debt').map(dbToSimple),
     securities: rows.filter(r => r.category === 'securities').map(dbToSecurities),
     bank:       rows.filter(r => r.category === 'bank').map(dbToBank),
@@ -517,7 +568,7 @@ export async function saveAssets(caseId: string, assets: Assets): Promise<void> 
     ...assets.pension.map(r => pensionToDb(r, caseId)),
     ...assets.business.map(r => businessToDb(r, caseId)),
     ...assets.financial.map(r => simpleToDb(r, caseId, 'financial')),
-    ...assets.vehicles.map(r => simpleToDb(r, caseId, 'vehicle')),
+    ...assets.vehicles.map(r => vehicleToDb(r, caseId)),
     ...assets.debts.map(r => simpleToDb(r, caseId, 'debt')),
     ...assets.securities.map(r => securitiesToDb(r, caseId)),
     ...assets.bank.map(r => bankToDb(r, caseId)),
