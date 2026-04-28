@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useEffect, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { loadAssets, saveAssets, deleteAsset } from '@/lib/db'
 import type { Assets, RealEstateRow, PensionRow, BusinessRow, SimpleRow } from '@/lib/db'
@@ -219,17 +220,320 @@ function RealEstateTable({ rows, onUpdate, onAdd, onRemove }: RealEstateTablePro
   )
 }
 
+// ─── Maslaka column mapping ───────────────────────────────────────────────────
+
+const COL_PRODUCT_NAME   = 'שם מוצר'
+const COL_COMPANY        = 'שם חברה מנהלת'
+const COL_PRODUCT_TYPE   = 'סוג מוצר'
+const COL_STATUS         = 'סטטוס'
+const COL_TOTAL_SAVINGS  = 'סך הכל חיסכון'
+const COL_JOIN_DATE      = 'תאריך הצטרפות לראשונה'
+
+function parseProductType(raw: string): PensionRow['productType'] {
+  const s = (raw ?? '').toLowerCase()
+  if (s.includes('גמל'))          return 'gemel'
+  if (s.includes('השתלמות'))      return 'hishtalmut'
+  if (s.includes('צבאי'))        return 'military'
+  if (s.includes('ממשלתי'))      return 'governmental'
+  return 'pension'
+}
+
+interface MaslakaPreviewRow {
+  id: string
+  productName: string
+  company: string
+  productType: string
+  status: string
+  totalSavings: number
+  joinDate: string
+  raw: Record<string, unknown>
+  checked: boolean
+}
+
+interface MaslakaImportModalProps {
+  onImport: (rows: PensionRow[]) => void
+  onClose: () => void
+}
+
+function MaslakaImportModal({ onImport, onClose }: MaslakaImportModalProps) {
+  const [party, setParty] = useState<'A' | 'B'>('A')
+  const [step, setStep] = useState<'upload' | 'preview'>('upload')
+  const [preview, setPreview] = useState<MaslakaPreviewRow[]>([])
+  const [parseError, setParseError] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = (file: File) => {
+    setParseError('')
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target!.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array', codepage: 65001 })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+
+        if (json.length === 0) { setParseError('הקובץ ריק או שאין נתונים בגיליון הראשון'); return }
+
+        const rows: MaslakaPreviewRow[] = json.map((row) => ({
+          id: crypto.randomUUID(),
+          productName: String(row[COL_PRODUCT_NAME] ?? ''),
+          company:     String(row[COL_COMPANY] ?? ''),
+          productType: String(row[COL_PRODUCT_TYPE] ?? ''),
+          status:      String(row[COL_STATUS] ?? ''),
+          totalSavings: Number(String(row[COL_TOTAL_SAVINGS] ?? '0').replace(/[^0-9.-]/g, '')) || 0,
+          joinDate:    String(row[COL_JOIN_DATE] ?? ''),
+          raw:         row,
+          checked:     true,
+        }))
+
+        setPreview(rows)
+        setStep('preview')
+      } catch {
+        setParseError('שגיאה בקריאת הקובץ. וודא שהקובץ תקין ובפורמט .xls / .xlsx')
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  const toggleRow = (id: string) =>
+    setPreview(prev => prev.map(r => r.id === id ? { ...r, checked: !r.checked } : r))
+
+  const toggleAll = (checked: boolean) =>
+    setPreview(prev => prev.map(r => ({ ...r, checked })))
+
+  const handleImport = () => {
+    const selected = preview.filter(r => r.checked)
+    const pensionRows: PensionRow[] = selected.map(r => ({
+      id: crypto.randomUUID(),
+      fundName: r.productName ? `${r.productName} - ${r.company}` : r.company,
+      productType: parseProductType(r.productType),
+      startDate: r.joinDate || '',
+      balance: r.totalSavings,
+      marriagePeriodShare: 100,
+      party,
+      balanceable: 'balanceable',
+      balancePercent: 50,
+    }))
+    onImport(pensionRows)
+    setSuccessMsg(`יובאו ${pensionRows.length} נכסים בהצלחה`)
+    setTimeout(() => { onClose() }, 1500)
+  }
+
+  const checkedCount = preview.filter(r => r.checked).length
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, direction: 'rtl',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: '14px', width: '90%', maxWidth: '820px',
+        maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>ייבוא מהמסלקה</h2>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#9ca3af', fontWeight: 300 }}>
+              העלה קובץ Excel מהמסלקה הפנסיונית הלאומית
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#9ca3af', lineHeight: 1 }}>✕</button>
+        </div>
+
+        <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+          {successMsg ? (
+            <div style={{ textAlign: 'center', padding: '32px', color: '#16a34a', fontSize: '16px', fontWeight: 600 }}>
+              ✓ {successMsg}
+            </div>
+          ) : step === 'upload' ? (
+            <>
+              {/* Party selector */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#374151', marginBottom: '10px' }}>
+                  שייך ל:
+                </label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {(['A', 'B'] as const).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setParty(p)}
+                      style={{
+                        padding: '9px 28px', borderRadius: '8px', border: '2px solid',
+                        borderColor: party === p ? '#4f46e5' : '#e5e7eb',
+                        background: party === p ? '#4f46e5' : 'white',
+                        color: party === p ? 'white' : '#374151',
+                        fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                      }}
+                    >
+                      {p === 'A' ? "צד א'" : "צד ב'"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* File upload */}
+              <div
+                style={{
+                  border: '2px dashed #d1d5db', borderRadius: '10px', padding: '36px',
+                  textAlign: 'center', cursor: 'pointer', background: '#fafafa',
+                  transition: 'border-color 0.15s',
+                }}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#4f46e5' }}
+                onDragLeave={e => { e.currentTarget.style.borderColor = '#d1d5db' }}
+                onDrop={e => {
+                  e.preventDefault()
+                  e.currentTarget.style.borderColor = '#d1d5db'
+                  const file = e.dataTransfer.files[0]
+                  if (file) handleFile(file)
+                }}
+              >
+                <div style={{ fontSize: '32px', marginBottom: '10px' }}>📥</div>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                  גרור קובץ לכאן או לחץ לבחירה
+                </div>
+                <div style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 300 }}>
+                  קבצי .xls ו-.xlsx בלבד
+                </div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xls,.xlsx"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
+                />
+              </div>
+
+              {parseError && (
+                <div style={{ marginTop: '16px', padding: '12px 16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#dc2626', fontSize: '14px' }}>
+                  {parseError}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Preview table */}
+              <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 300 }}>
+                  נמצאו {preview.length} שורות — {checkedCount} נבחרו
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => toggleAll(true)}  style={{ fontSize: '12px', color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>בחר הכל</button>
+                  <button onClick={() => toggleAll(false)} style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}>נקה הכל</button>
+                  <button onClick={() => setStep('upload')} style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}>← חזור</button>
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#f9fafb' }}>
+                      <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #f0f0f0', width: '36px' }}>
+                        <input type="checkbox" checked={checkedCount === preview.length && preview.length > 0} onChange={e => toggleAll(e.target.checked)} />
+                      </th>
+                      {['שם מוצר', 'חברה מנהלת', 'סוג מוצר', 'סטטוס', 'סך הכל חיסכון'].map(h => (
+                        <th key={h} style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.map((r, i) => (
+                      <tr key={r.id} style={{ borderBottom: i < preview.length - 1 ? '1px solid #f9fafb' : 'none', background: r.checked ? 'white' : '#fafafa' }}>
+                        <td style={{ padding: '9px 12px' }}>
+                          <input type="checkbox" checked={r.checked} onChange={() => toggleRow(r.id)} />
+                        </td>
+                        <td style={{ padding: '9px 12px', color: '#1a1a2e', fontWeight: 500 }}>{r.productName || '—'}</td>
+                        <td style={{ padding: '9px 12px', color: '#6b7280' }}>{r.company || '—'}</td>
+                        <td style={{ padding: '9px 12px', color: '#6b7280' }}>{r.productType || '—'}</td>
+                        <td style={{ padding: '9px 12px' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: r.status === 'פעיל' ? '#dcfce7' : '#f1f5f9', color: r.status === 'פעיל' ? '#16a34a' : '#64748b' }}>
+                            {r.status || '—'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '9px 12px', color: '#1a1a2e', fontWeight: 600, direction: 'ltr', textAlign: 'left' }}>
+                          ₪{r.totalSavings.toLocaleString('he-IL')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {!successMsg && (
+          <div style={{ padding: '16px 24px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-start', gap: '10px' }}>
+            {step === 'preview' && (
+              <button
+                onClick={handleImport}
+                disabled={checkedCount === 0}
+                style={{
+                  padding: '10px 24px', borderRadius: '9px', border: 'none', cursor: checkedCount === 0 ? 'not-allowed' : 'pointer',
+                  background: checkedCount === 0 ? '#e5e7eb' : '#4f46e5', color: checkedCount === 0 ? '#9ca3af' : 'white',
+                  fontSize: '14px', fontWeight: 700,
+                }}
+              >
+                ייבא נכסים נבחרים ({checkedCount})
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              style={{ padding: '10px 20px', borderRadius: '9px', border: '1.5px solid #e5e7eb', background: 'white', color: '#374151', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}
+            >
+              ביטול
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── PensionTable ─────────────────────────────────────────────────────────────
+
 interface PensionTableProps {
   rows: PensionRow[]
   onUpdate: (idx: number, field: keyof PensionRow, val: string | number) => void
   onAdd: () => void
   onRemove: (idx: number) => void
+  onImport: (rows: PensionRow[]) => void
 }
 
-function PensionTable({ rows, onUpdate, onAdd, onRemove }: PensionTableProps) {
+function PensionTable({ rows, onUpdate, onAdd, onRemove, onImport }: PensionTableProps) {
+  const [showImportModal, setShowImportModal] = useState(false)
+
   return (
     <>
-      <SectionHeader title="קרנות פנסיה וחסכון" onAdd={onAdd} />
+      {showImportModal && (
+        <MaslakaImportModal
+          onImport={(imported) => { onImport(imported); setShowImportModal(false) }}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>קרנות פנסיה וחסכון</h3>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setShowImportModal(true)}
+            style={{
+              padding: '0.375rem 0.875rem', fontSize: '0.8125rem', borderRadius: '6px',
+              border: '1.5px solid #4f46e5', background: 'white', color: '#4f46e5',
+              cursor: 'pointer', fontWeight: 600,
+            }}
+          >
+            📥 ייבוא מהמסלקה
+          </button>
+          <button className="btn-primary" onClick={onAdd} style={{ padding: '0.375rem 0.875rem', fontSize: '0.8125rem' }}>
+            + הוסף שורה
+          </button>
+        </div>
+      </div>
       {rows.length === 0 ? (
         <EmptyState label="פנסיה" onAdd={onAdd} />
       ) : (
@@ -517,6 +821,10 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
     }))
   , [])
 
+  const importPension = useCallback((rows: PensionRow[]) => {
+    setAssets(prev => ({ ...prev, pension: [...prev.pension, ...rows] }))
+  }, [])
+
   // ─── Business handlers ────────────────────────────────────────────────────
 
   const addBusiness = useCallback(() => {
@@ -665,6 +973,7 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
                 onUpdate={updatePension}
                 onAdd={addPension}
                 onRemove={removePension}
+                onImport={importPension}
               />
             )}
             {activeTab === 'business' && (
