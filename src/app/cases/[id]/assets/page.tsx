@@ -947,28 +947,58 @@ function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
 
   const handleSearch = async (idx: number, plate: string) => {
     const id = rows[idx].id
-    if (!plate.trim()) return
+    const p = plate.trim()
+    if (!p) return
     setSearchStatus(prev => ({ ...prev, [id]: 'loading' }))
-    const RESOURCES = [
+
+    const BASE = 'https://data.gov.il/api/3/action/datastore_search'
+    const q = encodeURIComponent(p)
+    const filters = encodeURIComponent(JSON.stringify({ mispar_rechev: p }))
+
+    // Private cars + commercial — use &q= (free text)
+    const carResources = [
       '053cea08-09bc-40ec-8f7a-156f0677aff3', // private cars
-      'bf9df4e2-d90d-4b55-b36e-b8581d8a9f53', // motorcycles
       '03adc637-b6fe-402b-9937-7c3d3afc9140', // commercial vehicles
     ]
+    // Motorcycles — try both resource IDs with &filters= (exact match) and &q=
+    const motoResources = [
+      'bf9df4e2-d90d-4b55-b36e-b8581d8a9f53',
+      'cd3acccc-030b-4b5f-8d24-64dab18c9b67',
+    ]
+
+    const fetchJson = (url: string) =>
+      fetch(url).then(r => r.json()).catch(() => null)
+
     try {
-      const q = encodeURIComponent(plate.trim())
-      const results = await Promise.all(
-        RESOURCES.map(rid =>
-          fetch(`https://data.gov.il/api/3/action/datastore_search?resource_id=${rid}&q=${q}`)
-            .then(r => r.json())
-            .catch(() => null)
-        )
-      )
-      const rec = results.map(j => j?.result?.records?.[0]).find(Boolean)
+      const [carResults, motoResults] = await Promise.all([
+        Promise.all(carResources.map(rid => fetchJson(`${BASE}?resource_id=${rid}&q=${q}`))),
+        Promise.all(motoResources.flatMap(rid => [
+          fetchJson(`${BASE}?resource_id=${rid}&filters=${filters}`),
+          fetchJson(`${BASE}?resource_id=${rid}&q=${q}`),
+        ])),
+      ])
+
+      // Log motorcycle raw responses for field discovery
+      console.log('[Vehicle API] Motorcycle responses:', JSON.stringify(motoResults.map(j => ({
+        success: j?.success,
+        count: j?.result?.total,
+        firstRecord: j?.result?.records?.[0],
+      })), null, 2))
+
+      const allResults = [...carResults, ...motoResults]
+      const rec = allResults.map(j => j?.result?.records?.[0]).find(Boolean)
+
       if (rec) {
-        onUpdate(idx, 'manufacturer', String(rec.tozeret_nm ?? '').trim())
-        onUpdate(idx, 'model',        String(rec.kinuy_mishari ?? '').trim())
-        onUpdate(idx, 'year',         Number(rec.shnat_yitzur ?? 0))
-        onUpdate(idx, 'color',        String(rec.tzeva_rechev ?? '').trim())
+        console.log('[Vehicle API] Matched record:', rec)
+        // Cars use tozeret_nm/kinuy_mishari; motorcycles may use tozar/degem_nm
+        const manufacturer = String(rec.tozeret_nm ?? rec.tozar ?? '').trim()
+        const model        = String(rec.kinuy_mishari ?? rec.degem_nm ?? '').trim()
+        const year         = Number(rec.shnat_yitzur ?? 0)
+        const color        = String(rec.tzeva_rechev ?? '').trim()
+        onUpdate(idx, 'manufacturer', manufacturer)
+        onUpdate(idx, 'model',        model)
+        onUpdate(idx, 'year',         year)
+        onUpdate(idx, 'color',        color)
         setSearchStatus(prev => ({ ...prev, [id]: 'found' }))
       } else {
         setSearchStatus(prev => ({ ...prev, [id]: 'notfound' }))
