@@ -949,12 +949,21 @@ function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
     const id = rows[idx].id
     if (!plate.trim()) return
     setSearchStatus(prev => ({ ...prev, [id]: 'loading' }))
+    const RESOURCES = [
+      '053cea08-09bc-40ec-8f7a-156f0677aff3', // private cars
+      'bf9df4e2-d90d-4b55-b36e-b8581d8a9f53', // motorcycles
+      '03adc637-b6fe-402b-9937-7c3d3afc9140', // commercial vehicles
+    ]
     try {
-      const res = await fetch(
-        `https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&q=${encodeURIComponent(plate.trim())}`
+      const q = encodeURIComponent(plate.trim())
+      const results = await Promise.all(
+        RESOURCES.map(rid =>
+          fetch(`https://data.gov.il/api/3/action/datastore_search?resource_id=${rid}&q=${q}`)
+            .then(r => r.json())
+            .catch(() => null)
+        )
       )
-      const json = await res.json()
-      const rec = json?.result?.records?.[0]
+      const rec = results.map(j => j?.result?.records?.[0]).find(Boolean)
       if (rec) {
         onUpdate(idx, 'manufacturer', String(rec.tozeret_nm ?? '').trim())
         onUpdate(idx, 'model',        String(rec.kinuy_mishari ?? '').trim())
