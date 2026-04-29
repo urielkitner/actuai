@@ -80,19 +80,45 @@ function PieChart({ slices }: { slices: { label: string; value: number; color: s
   )
 }
 
+interface CaseInfo {
+  caseNumber: string
+  partyAName: string
+  partyBName: string
+}
+
 export default function SummaryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const [assets, setAssets] = useState<Assets | null>(null)
+  const [caseInfo, setCaseInfo] = useState<CaseInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [reportOpening, setReportOpening] = useState('דוח איזון משאבים זה הוכן על ידי אקטואר מוסמך')
+  const [reportDisclaimer, setReportDisclaimer] = useState('הערה: דוח זה מהווה חוות דעת מקצועית בלבד')
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { router.replace('/auth'); return }
       try {
-        const loaded = await loadAssets(id)
+        const [loaded, caseRes, settingsRes] = await Promise.all([
+          loadAssets(id),
+          supabase.from('cases').select('case_number, party_a_name, party_b_name').eq('id', id).single(),
+          supabase.from('admin_settings').select('key, value').in('key', ['report_opening', 'report_disclaimer']),
+        ])
         setAssets(loaded)
+        if (caseRes.data) {
+          setCaseInfo({
+            caseNumber: caseRes.data.case_number,
+            partyAName: caseRes.data.party_a_name,
+            partyBName: caseRes.data.party_b_name,
+          })
+        }
+        if (settingsRes.data) {
+          const opening = settingsRes.data.find((s: { key: string; value: string }) => s.key === 'report_opening')?.value
+          const disclaimer = settingsRes.data.find((s: { key: string; value: string }) => s.key === 'report_disclaimer')?.value
+          if (opening) setReportOpening(opening)
+          if (disclaimer) setReportDisclaimer(disclaimer)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'שגיאה בטעינת הנכסים')
       } finally {
@@ -170,8 +196,193 @@ export default function SummaryPage({ params }: { params: Promise<{ id: string }
     { label: 'צד ב — רכב',     value: calcVehicleB(),                color: '#fcd34d' },
   ].filter(s => s.value > 0)
 
+  // ─── Export handlers ───────────────────────────────────────────────────────
+
+  const handlePdfExport = () => {
+    window.print()
+  }
+
+  const handleExcelExport = async () => {
+    const { utils, writeFile } = await import('xlsx')
+
+    const today = new Date().toLocaleDateString('he-IL')
+    const safeDate = today.replace(/\//g, '-')
+    const safeCaseNum = (caseInfo?.caseNumber ?? id).replace(/[/\\:*?"<>|]/g, '_')
+    const fileName = `איזון_${safeCaseNum}_${safeDate}.xlsx`
+
+    const wb = utils.book_new()
+
+    // Sheet 1 — Summary
+    const summaryRows: (string | number)[][] = [
+      ['מספר תיק', caseInfo?.caseNumber ?? id],
+      ['צד א', caseInfo?.partyAName ?? ''],
+      ['צד ב', caseInfo?.partyBName ?? ''],
+      ['תאריך הדוח', today],
+      [],
+      ['סיכום נכסים'],
+      ['סך נכסי צד א', Math.round(totalA)],
+      ['סך נכסי צד ב', Math.round(totalB)],
+      ['פער', Math.round(gap)],
+      ['תשלום מאזן', Math.round(balancePayment)],
+      [],
+      ['פתיח הדוח', reportOpening],
+    ]
+    utils.book_append_sheet(wb, utils.aoa_to_sheet(summaryRows), 'סיכום')
+
+    // Sheet 2 — Detail
+    const detailRows: (string | number)[][] = [
+      ['קטגוריה', 'שם', 'צד', 'שווי', 'בר-איזון', 'שווי לאיזון'],
+    ]
+
+    for (const r of assets.realEstate) {
+      if (r.valueA) detailRows.push(['נדל"ן', r.name, 'א', r.valueA, r.balanceable === 'balanceable' ? 'כן' : 'לא', r.balanceable === 'balanceable' ? Math.round(r.valueA * r.balancePercent / 100) : 0])
+      if (r.valueB) detailRows.push(['נדל"ן', r.name, 'ב', r.valueB, r.balanceable === 'balanceable' ? 'כן' : 'לא', r.balanceable === 'balanceable' ? Math.round(r.valueB * r.balancePercent / 100) : 0])
+    }
+    for (const p of assets.pension) {
+      const v = p.balance * (p.marriagePeriodShare / 100)
+      detailRows.push(['פנסיה וגמל', p.fundName, p.party === 'A' ? 'א' : 'ב', Math.round(v), p.balanceable === 'balanceable' ? 'כן' : 'לא', p.balanceable === 'balanceable' ? Math.round(v * p.balancePercent / 100) : 0])
+    }
+    for (const b of assets.business) {
+      const v = b.value * (b.ownershipPercent / 100)
+      detailRows.push(['עסק/חברה', b.companyName, b.party === 'A' ? 'א' : 'ב', Math.round(v), b.balanceable === 'balanceable' ? 'כן' : 'לא', b.balanceable === 'balanceable' ? Math.round(v * b.balancePercent / 100) : 0])
+    }
+    for (const f of assets.financial) {
+      if (f.valueA) detailRows.push(['פיננסי', f.name, 'א', f.valueA, f.balanceable === 'balanceable' ? 'כן' : 'לא', f.balanceable === 'balanceable' ? Math.round(f.valueA * f.balancePercent / 100) : 0])
+      if (f.valueB) detailRows.push(['פיננסי', f.name, 'ב', f.valueB, f.balanceable === 'balanceable' ? 'כן' : 'לא', f.balanceable === 'balanceable' ? Math.round(f.valueB * f.balancePercent / 100) : 0])
+    }
+    for (const v of assets.vehicles) {
+      const name = [v.manufacturer, v.model].filter(Boolean).join(' ') || v.licensePlate
+      detailRows.push(['רכב', name, v.party === 'A' ? 'א' : 'ב', v.marketValue, v.balanceable === 'balanceable' ? 'כן' : 'לא', v.balanceable === 'balanceable' ? Math.round(v.marketValue * v.balancePercent / 100) : 0])
+    }
+    for (const d of assets.debts) {
+      if (d.valueA) detailRows.push(['חובות', d.name, 'א', -d.valueA, d.balanceable === 'balanceable' ? 'כן' : 'לא', d.balanceable === 'balanceable' ? Math.round(-d.valueA * d.balancePercent / 100) : 0])
+      if (d.valueB) detailRows.push(['חובות', d.name, 'ב', -d.valueB, d.balanceable === 'balanceable' ? 'כן' : 'לא', d.balanceable === 'balanceable' ? Math.round(-d.valueB * d.balancePercent / 100) : 0])
+    }
+
+    utils.book_append_sheet(wb, utils.aoa_to_sheet(detailRows), 'פירוט')
+
+    writeFile(wb, fileName)
+  }
+
+  // ─── Shared table style helpers ────────────────────────────────────────────
+
+  const printTd = (extra?: React.CSSProperties): React.CSSProperties => ({
+    padding: '0.4rem 0.6rem',
+    border: '1px solid #d1d5db',
+    ...extra,
+  })
+
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
+
+      {/* ── Print styles ── */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #print-report, #print-report * { visibility: visible; }
+          #print-report {
+            position: absolute;
+            left: 0; top: 0;
+            width: 100%;
+            direction: rtl;
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            color: #000;
+            background: #fff;
+            padding: 2rem;
+            box-sizing: border-box;
+          }
+          .print-disclaimer { page-break-before: always; }
+        }
+      `}</style>
+
+      {/* ── Print-only report div ── */}
+      <div id="print-report" style={{ display: 'none' }}>
+        {/* Header */}
+        <div style={{ borderBottom: '2px solid #6366f1', paddingBottom: '0.75rem', marginBottom: '1.25rem', textAlign: 'center' }}>
+          <div style={{ fontWeight: '800', fontSize: '1.375rem', color: '#6366f1', marginBottom: '0.25rem' }}>ActuAi</div>
+          <div style={{ fontWeight: '700', fontSize: '1.125rem', color: '#1f2937' }}>דוח איזון משאבים</div>
+        </div>
+
+        {/* Opening */}
+        <p style={{ color: '#374151', marginBottom: '1.25rem', fontSize: '0.9rem' }}>{reportOpening}</p>
+
+        {/* Case details */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.25rem' }}>
+          <tbody>
+            <tr>
+              <td style={{ ...printTd({ fontWeight: '600', width: '25%', background: '#f9fafb' }) }}>מספר תיק:</td>
+              <td style={printTd({ width: '25%' })}>{caseInfo?.caseNumber ?? id}</td>
+              <td style={{ ...printTd({ fontWeight: '600', width: '25%', background: '#f9fafb' }) }}>תאריך הדוח:</td>
+              <td style={printTd({ width: '25%' })}>{new Date().toLocaleDateString('he-IL')}</td>
+            </tr>
+            <tr>
+              <td style={{ ...printTd({ fontWeight: '600', background: '#f9fafb' }) }}>שם צד א:</td>
+              <td style={printTd()}>{caseInfo?.partyAName ?? ''}</td>
+              <td style={{ ...printTd({ fontWeight: '600', background: '#f9fafb' }) }}>שם צד ב:</td>
+              <td style={printTd()}>{caseInfo?.partyBName ?? ''}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Summary */}
+        <div style={{ fontWeight: '700', fontSize: '0.95rem', marginBottom: '0.5rem' }}>סיכום</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.25rem' }}>
+          <tbody>
+            {([
+              ['סך נכסי צד א', fmt(totalA)],
+              ['סך נכסי צד ב', fmt(totalB)],
+              ['פער בין הצדדים', fmt(gap)],
+              [`תשלום מאזן (מצד ${payerSide})`, fmt(balancePayment)],
+            ] as [string, string][]).map(([label, value]) => (
+              <tr key={label}>
+                <td style={{ ...printTd({ fontWeight: '600', width: '50%', background: '#f9fafb' }) }}>{label}</td>
+                <td style={{ ...printTd({ fontWeight: '700', color: '#6366f1' }) }}>{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Category breakdown */}
+        {categories.length > 0 && (
+          <>
+            <div style={{ fontWeight: '700', fontSize: '0.95rem', marginBottom: '0.5rem' }}>פירוט לפי קטגוריה</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.25rem' }}>
+              <thead>
+                <tr style={{ background: '#f3f4f6' }}>
+                  {['קטגוריה', 'צד א (₪)', 'צד ב (₪)', 'סה"כ (₪)'].map(h => (
+                    <th key={h} style={{ ...printTd({ textAlign: 'right', fontWeight: '600' }) }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((cat, i) => (
+                  <tr key={i}>
+                    <td style={printTd()}>{cat.label}</td>
+                    <td style={printTd()}>{fmt(cat.valueA)}</td>
+                    <td style={printTd()}>{fmt(cat.valueB)}</td>
+                    <td style={{ ...printTd({ fontWeight: '700' }) }}>{fmt(cat.valueA + cat.valueB)}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: '#f3f4f6' }}>
+                  <td style={{ ...printTd({ fontWeight: '700' }) }}>סה&quot;כ</td>
+                  <td style={{ ...printTd({ fontWeight: '700', color: '#6366f1' }) }}>{fmt(totalA)}</td>
+                  <td style={{ ...printTd({ fontWeight: '700', color: '#8b5cf6' }) }}>{fmt(totalB)}</td>
+                  <td style={{ ...printTd({ fontWeight: '700' }) }}>{fmt(totalA + totalB)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {/* Disclaimer */}
+        <div className="print-disclaimer" style={{ borderTop: '1px solid #d1d5db', paddingTop: '0.75rem', marginTop: '1.5rem' }}>
+          <p style={{ color: '#6b7280', fontSize: '0.8rem', margin: '0 0 1.5rem 0' }}>{reportDisclaimer}</p>
+          <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: '0.75rem' }}>
+            הופק באמצעות ActuAi · tryactuai.com
+          </div>
+        </div>
+      </div>
+
       {/* Navbar */}
       <nav style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '0 1.5rem', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)' }}>
         <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none' }}>
@@ -254,14 +465,14 @@ export default function SummaryPage({ params }: { params: Promise<{ id: string }
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.5rem' }}>
           <button
             className="btn-primary"
-            onClick={() => alert('פונקציית ייצוא PDF תהיה זמינה בקרוב')}
+            onClick={handlePdfExport}
             style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             📄 הפק דוח PDF
           </button>
           <button
             className="btn-secondary"
-            onClick={() => alert('פונקציית ייצוא Excel תהיה זמינה בקרוב')}
+            onClick={handleExcelExport}
             style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             📊 הפק דוח Excel
