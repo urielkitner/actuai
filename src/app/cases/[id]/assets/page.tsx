@@ -962,7 +962,7 @@ function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
     ]
     // Motorcycles — try both resource IDs with &filters= (exact match) and &q=
     const motoResources = [
-      'bf9df4e2-d90d-4b55-b36e-b8581d8a9f53',
+      'bf9df478-e222-4f52-bc0c-804d60a7465f',
       'cd3acccc-030b-4b5f-8d24-64dab18c9b67',
     ]
 
