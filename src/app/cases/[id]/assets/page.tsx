@@ -1037,11 +1037,11 @@ function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
                     </td>
                     <td>
                       <input type="text" className="input" value={r.manufacturer}
-                        onChange={e => onUpdate(i, 'manufacturer', e.target.value)} placeholder="טויוטה" />
+                        onChange={e => onUpdate(i, 'manufacturer', e.target.value)} placeholder="טויוטה" style={{ minWidth: '120px', width: '120px' }} />
                     </td>
                     <td>
                       <input type="text" className="input" value={r.model}
-                        onChange={e => onUpdate(i, 'model', e.target.value)} placeholder="קורולה" />
+                        onChange={e => onUpdate(i, 'model', e.target.value)} placeholder="קורולה" style={{ minWidth: '130px', width: '130px' }} />
                     </td>
                     <td>
                       <input type="number" className="input" value={r.year || ''}
