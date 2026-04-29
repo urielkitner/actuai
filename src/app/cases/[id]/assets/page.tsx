@@ -1046,7 +1046,7 @@ function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
                     <td>
                       <input type="number" className="input" value={r.year || ''}
                         onChange={e => onUpdate(i, 'year', Number(e.target.value))}
-                        placeholder="2019" dir="ltr" style={{ textAlign: 'left' }} />
+                        placeholder="2019" dir="ltr" style={{ textAlign: 'left', minWidth: '80px', width: '80px' }} />
                     </td>
                     <td>
                       <input type="text" className="input" value={r.color}
