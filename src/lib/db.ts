@@ -54,8 +54,9 @@ export interface SimpleRow {
 }
 
 export interface VehicleRow {
-  id: string; name: string; vehicleType: string; year: number
-  licensePlate: string; listPrice: number; marketValue: number
+  id: string; licensePlate: string; manufacturer: string; model: string
+  year: number; color: string; vehicleType: string
+  listPrice: number; marketValue: number
   party: 'A' | 'B'; balanceable: Balanceable; balancePercent: number
 }
 
@@ -175,10 +176,12 @@ function dbToVehicle(r: DbAsset): VehicleRow {
   const party = (r.party ?? 'A') as 'A' | 'B'
   return {
     id: r.id,
-    name: r.name,
-    vehicleType: (r.metadata?.vehicle_type as string) ?? 'private',
-    year: Number(r.metadata?.year ?? 0),
     licensePlate: (r.metadata?.license_plate as string) ?? '',
+    manufacturer: (r.metadata?.manufacturer as string) ?? r.name ?? '',
+    model: (r.metadata?.model as string) ?? '',
+    year: Number(r.metadata?.year ?? 0),
+    color: (r.metadata?.color as string) ?? '',
+    vehicleType: (r.metadata?.vehicle_type as string) ?? 'private',
     listPrice: Number(r.metadata?.list_price ?? 0),
     marketValue: party === 'A' ? Number(r.value_a) : Number(r.value_b),
     party,
@@ -192,7 +195,7 @@ function vehicleToDb(r: VehicleRow, caseId: string): Omit<DbAsset, 'metadata'> &
     id: r.id,
     case_id: caseId,
     category: 'vehicle',
-    name: r.name,
+    name: [r.manufacturer, r.model].filter(Boolean).join(' ') || r.licensePlate || '',
     value_a: r.party === 'A' ? r.marketValue : 0,
     value_b: r.party === 'B' ? r.marketValue : 0,
     is_balanceable: r.balanceable === 'balanceable',
@@ -208,9 +211,12 @@ function vehicleToDb(r: VehicleRow, caseId: string): Omit<DbAsset, 'metadata'> &
     is_appraised: false,
     founded_date: null,
     metadata: {
-      vehicle_type: r.vehicleType,
-      year: r.year,
       license_plate: r.licensePlate || null,
+      manufacturer: r.manufacturer || null,
+      model: r.model || null,
+      year: r.year || null,
+      color: r.color || null,
+      vehicle_type: r.vehicleType,
       list_price: r.listPrice,
     },
   }

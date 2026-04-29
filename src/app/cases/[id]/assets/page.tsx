@@ -34,8 +34,8 @@ const defaultSimple = (): SimpleRow => ({
   id: crypto.randomUUID(), name: '', valueA: 0, valueB: 0, balanceable: 'balanceable', balancePercent: 50,
 })
 const defaultVehicle = (): VehicleRow => ({
-  id: crypto.randomUUID(), name: '', vehicleType: 'private', year: 0,
-  licensePlate: '', listPrice: 0, marketValue: 0,
+  id: crypto.randomUUID(), licensePlate: '', manufacturer: '', model: '',
+  year: 0, color: '', vehicleType: 'private', listPrice: 0, marketValue: 0,
   party: 'A', balanceable: 'balanceable', balancePercent: 50,
 })
 const defaultSecurities = (): SecuritiesRow => ({
@@ -933,6 +933,8 @@ function SimpleTable({ title, rows, onUpdate, onAdd, onRemove }: SimpleTableProp
 
 // ─── VehicleTable ─────────────────────────────────────────────────────────────
 
+type VehicleSearchStatus = 'idle' | 'loading' | 'found' | 'notfound'
+
 interface VehicleTableProps {
   rows: VehicleRow[]
   onUpdate: (idx: number, field: keyof VehicleRow, val: string | number) => void
@@ -941,6 +943,32 @@ interface VehicleTableProps {
 }
 
 function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
+  const [searchStatus, setSearchStatus] = useState<Record<string, VehicleSearchStatus>>({})
+
+  const handleSearch = async (idx: number, plate: string) => {
+    const id = rows[idx].id
+    if (!plate.trim()) return
+    setSearchStatus(prev => ({ ...prev, [id]: 'loading' }))
+    try {
+      const res = await fetch(
+        `https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&q=${encodeURIComponent(plate.trim())}`
+      )
+      const json = await res.json()
+      const rec = json?.result?.records?.[0]
+      if (rec) {
+        onUpdate(idx, 'manufacturer', String(rec.tozeret_nm ?? '').trim())
+        onUpdate(idx, 'model',        String(rec.kinuy_mishari ?? '').trim())
+        onUpdate(idx, 'year',         Number(rec.shnat_yitzur ?? 0))
+        onUpdate(idx, 'color',        String(rec.tzeva_rechev ?? '').trim())
+        setSearchStatus(prev => ({ ...prev, [id]: 'found' }))
+      } else {
+        setSearchStatus(prev => ({ ...prev, [id]: 'notfound' }))
+      }
+    } catch {
+      setSearchStatus(prev => ({ ...prev, [id]: 'notfound' }))
+    }
+  }
+
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -951,13 +979,15 @@ function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
         <EmptyState label="רכב" onAdd={onAdd} />
       ) : (
         <div className="table-container" style={{ overflowX: 'auto' }}>
-          <table style={{ minWidth: '1000px' }}>
+          <table style={{ minWidth: '1200px' }}>
             <thead>
               <tr>
-                <th style={{ minWidth: '150px' }}>שם / תיאור</th>
-                <th style={{ minWidth: '110px' }}>סוג רכב</th>
+                <th style={{ minWidth: '180px' }}>מספר רכב</th>
+                <th style={{ minWidth: '110px' }}>יצרן</th>
+                <th style={{ minWidth: '110px' }}>דגם</th>
                 <th style={{ minWidth: '80px' }}>שנת ייצור</th>
-                <th style={{ minWidth: '110px' }}>מספר רכב</th>
+                <th style={{ minWidth: '90px' }}>צבע</th>
+                <th style={{ minWidth: '110px' }}>סוג רכב</th>
                 <th style={{ minWidth: '120px' }}>מחיר מחירון (₪)</th>
                 <th style={{ minWidth: '120px' }}>שווי רכב (₪)</th>
                 <th style={{ minWidth: '70px' }}>צד</th>
@@ -967,52 +997,89 @@ function VehicleTable({ rows, onUpdate, onAdd, onRemove }: VehicleTableProps) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={r.id}>
-                  <td>
-                    <input type="text" className="input" value={r.name}
-                      onChange={e => onUpdate(i, 'name', e.target.value)}
-                      placeholder='טויוטה קורולה' style={{ fontWeight: 600 }} />
-                  </td>
-                  <td>
-                    <Sel value={r.vehicleType} onChange={v => onUpdate(i, 'vehicleType', v)} options={[
-                      { value: 'private',    label: 'פרטי' },
-                      { value: 'commercial', label: 'מסחרי' },
-                      { value: 'motorcycle', label: 'אופנוע' },
-                      { value: 'work',       label: 'רכב עבודה' },
-                      { value: 'other',      label: 'אחר' },
-                    ]} />
-                  </td>
-                  <td>
-                    <input type="number" className="input" value={r.year || ''}
-                      onChange={e => onUpdate(i, 'year', Number(e.target.value))}
-                      placeholder="2019" dir="ltr"
-                      style={{ textAlign: 'left', maxWidth: '80px' }} />
-                  </td>
-                  <td>
-                    <input type="text" className="input" value={r.licensePlate}
-                      onChange={e => onUpdate(i, 'licensePlate', e.target.value)}
-                      placeholder="12-345-67" dir="ltr"
-                      style={{ textAlign: 'left' }} />
-                  </td>
-                  <td><NumCell value={r.listPrice} onChange={v => onUpdate(i, 'listPrice', v)} /></td>
-                  <td><NumCell value={r.marketValue} onChange={v => onUpdate(i, 'marketValue', v)} /></td>
-                  <td>
-                    <Sel value={r.party} onChange={v => onUpdate(i, 'party', v)} options={[
-                      { value: 'A', label: 'צד א' },
-                      { value: 'B', label: 'צד ב' },
-                    ]} />
-                  </td>
-                  <td>
-                    <Sel value={r.balanceable} onChange={v => onUpdate(i, 'balanceable', v)} options={[
-                      { value: 'balanceable', label: 'בר-איזון' },
-                      { value: 'excluded',    label: 'מוחרג' },
-                    ]} />
-                  </td>
-                  <td><Inp type="number" value={r.balancePercent} onChange={v => onUpdate(i, 'balancePercent', Number(v))} dir="ltr" /></td>
-                  <td><DeleteBtn onClick={() => onRemove(i)} /></td>
-                </tr>
-              ))}
+              {rows.map((r, i) => {
+                const status = searchStatus[r.id] ?? 'idle'
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            className="input"
+                            value={r.licensePlate}
+                            onChange={e => onUpdate(i, 'licensePlate', e.target.value)}
+                            placeholder="12-345-67"
+                            dir="ltr"
+                            style={{ textAlign: 'left', flex: 1, fontWeight: 600 }}
+                            onKeyDown={e => e.key === 'Enter' && handleSearch(i, r.licensePlate)}
+                          />
+                          <button
+                            onClick={() => handleSearch(i, r.licensePlate)}
+                            disabled={status === 'loading'}
+                            style={{
+                              flexShrink: 0, padding: '5px 8px', fontSize: '11px', fontWeight: 600,
+                              background: '#4f46e5', color: 'white', border: 'none',
+                              borderRadius: '6px', cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+                              opacity: status === 'loading' ? 0.7 : 1, whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {status === 'loading' ? '...' : '🔍 חפש'}
+                          </button>
+                        </div>
+                        {status === 'found' && (
+                          <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>✓ פרטי הרכב נמצאו</span>
+                        )}
+                        {status === 'notfound' && (
+                          <span style={{ fontSize: '11px', color: '#dc2626', fontWeight: 600 }}>מספר רכב לא נמצא</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <input type="text" className="input" value={r.manufacturer}
+                        onChange={e => onUpdate(i, 'manufacturer', e.target.value)} placeholder="טויוטה" />
+                    </td>
+                    <td>
+                      <input type="text" className="input" value={r.model}
+                        onChange={e => onUpdate(i, 'model', e.target.value)} placeholder="קורולה" />
+                    </td>
+                    <td>
+                      <input type="number" className="input" value={r.year || ''}
+                        onChange={e => onUpdate(i, 'year', Number(e.target.value))}
+                        placeholder="2019" dir="ltr" style={{ textAlign: 'left' }} />
+                    </td>
+                    <td>
+                      <input type="text" className="input" value={r.color}
+                        onChange={e => onUpdate(i, 'color', e.target.value)} placeholder="לבן" />
+                    </td>
+                    <td>
+                      <Sel value={r.vehicleType} onChange={v => onUpdate(i, 'vehicleType', v)} options={[
+                        { value: 'private',    label: 'פרטי' },
+                        { value: 'commercial', label: 'מסחרי' },
+                        { value: 'motorcycle', label: 'אופנוע' },
+                        { value: 'work',       label: 'רכב עבודה' },
+                        { value: 'other',      label: 'אחר' },
+                      ]} />
+                    </td>
+                    <td><NumCell value={r.listPrice} onChange={v => onUpdate(i, 'listPrice', v)} /></td>
+                    <td><NumCell value={r.marketValue} onChange={v => onUpdate(i, 'marketValue', v)} /></td>
+                    <td>
+                      <Sel value={r.party} onChange={v => onUpdate(i, 'party', v)} options={[
+                        { value: 'A', label: 'צד א' },
+                        { value: 'B', label: 'צד ב' },
+                      ]} />
+                    </td>
+                    <td>
+                      <Sel value={r.balanceable} onChange={v => onUpdate(i, 'balanceable', v)} options={[
+                        { value: 'balanceable', label: 'בר-איזון' },
+                        { value: 'excluded',    label: 'מוחרג' },
+                      ]} />
+                    </td>
+                    <td><Inp type="number" value={r.balancePercent} onChange={v => onUpdate(i, 'balancePercent', Number(v))} dir="ltr" /></td>
+                    <td><DeleteBtn onClick={() => onRemove(i)} /></td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
