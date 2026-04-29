@@ -1276,13 +1276,24 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
   const [pageLoading, setPageLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [caseInfo, setCaseInfo] = useState<{ caseNumber: string; partyA: string; partyB: string } | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { router.replace('/auth'); return }
       try {
-        const loaded = await loadAssets(id)
+        const [loaded, caseRes] = await Promise.all([
+          loadAssets(id),
+          supabase.from('cases').select('case_number, party_a_name, party_b_name').eq('id', id).single(),
+        ])
         setAssets(loaded)
+        if (caseRes.data) {
+          setCaseInfo({
+            caseNumber: caseRes.data.case_number,
+            partyA: caseRes.data.party_a_name,
+            partyB: caseRes.data.party_b_name,
+          })
+        }
       } catch {
         // If no assets yet, start with empty state — that's fine
       } finally {
@@ -1491,6 +1502,24 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
           ← חזור ללוח הבקרה
         </button>
       </nav>
+
+      {/* Sticky case info bar */}
+      {caseInfo && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 10,
+          background: 'white', borderBottom: '1px solid #e5e7eb',
+          padding: '8px 24px',
+          display: 'flex', alignItems: 'center', gap: '0',
+          direction: 'rtl', fontSize: '13px', color: '#6b7280',
+          fontFamily: 'Heebo, sans-serif',
+        }}>
+          <span>מספר תיק:&nbsp;<span style={{ color: '#1a1a2e', fontWeight: 600 }}>{caseInfo.caseNumber}</span></span>
+          <span style={{ margin: '0 10px', color: '#e5e7eb' }}>|</span>
+          <span>צד א׳:&nbsp;<span style={{ color: '#1a1a2e', fontWeight: 600 }}>{caseInfo.partyA}</span></span>
+          <span style={{ margin: '0 10px', color: '#e5e7eb' }}>|</span>
+          <span>צד ב׳:&nbsp;<span style={{ color: '#1a1a2e', fontWeight: 600 }}>{caseInfo.partyB}</span></span>
+        </div>
+      )}
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
         <StepIndicator step={2} />
