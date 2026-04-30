@@ -664,6 +664,21 @@ function PensionTable({ rows, onUpdate, onAdd, onRemove, onImport }: PensionTabl
           onClose={() => setShowImportModal(false)}
         />
       )}
+      {/* Pension law reference banner */}
+      <div style={{ background: '#eff6ff', borderRight: '3px solid #3b82f6', borderRadius: '8px', padding: '12px 16px', marginBottom: '1rem', direction: 'rtl' }}>
+        <span style={{ fontSize: '13px', color: '#1e40af', fontFamily: "'Heebo', sans-serif" }}>
+          ⚖️{' '}חלוקת הפנסיה מתקיימת על פי{' '}
+          <a
+            href="https://www.nevo.co.il/law_html/law01/501_070.htm"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#2563eb', textDecoration: 'underline' }}
+          >
+            חוק לחלוקת חיסכון פנסיוני בין בני זוג שנפרדו, תשע&quot;ד-2014
+          </a>
+        </span>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>קרנות פנסיה וחסכון</h3>
         <div style={{ display: 'flex', gap: '8px' }}>
